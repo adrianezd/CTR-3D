@@ -6,7 +6,7 @@ This is a fork of [CTR Native](https://github.com/CTR-tools/ctr-native), the nat
 
 On a New 3DS the game runs with stereoscopic 3D on the slider, a genuinely widescreen top screen, and the HUD and map on the bottom screen. Races reach about 45-60 FPS there and about 25-30 FPS on an Old 3DS / 2DS (the PS1 original ran at 30). Not every track and mode has been played through yet; bug reports are welcome.
 
-As far as we can determine, this is the first PlayStation decompilation ported to 3DS homebrew. Fittingly, CTR was Nintendo's internal codename for the 3DS.
+CTR was also Nintendo's internal codename for the 3DS.
 
 The PC port is still here and still builds; see [PC builds](#pc-builds-windows-and-linux) at the bottom. Everything above that section is about the 3DS.
 
