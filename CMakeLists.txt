@@ -699,6 +699,7 @@ if(NINTENDO_3DS)
         NAME "CTR 3D"
         DESCRIPTION "Crash Team Racing for New 3DS ${CTR_NATIVE_VERSION}"
         AUTHOR "${CTR_NATIVE_AUTHOR}"
+        ICON "${CMAKE_SOURCE_DIR}/metadata/icon.png"
     )
     ctr_create_3dsx(ctr_native SMDH ctr_native.smdh)
 else()
