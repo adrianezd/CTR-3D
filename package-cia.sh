@@ -60,7 +60,11 @@ BANNERTOOL="$(find_tool bannertool "${BANNERTOOL:-}")"
 [[ -f "${ELF}" && -f "${SMDH}" ]] || { echo "ERROR: ${ELF} or ${SMDH} missing; build for 3DS first (see README.md)." >&2; exit 1; }
 
 mkdir -p "${OUT}"
-# Banner: use BANNER_PNG / BANNER_WAV if given, else a plain placeholder.
+# Banner: use BANNER_PNG / BANNER_WAV if given, else metadata/banner.png, else a plain placeholder.
+# (No audio yet: the silent placeholder stays until metadata/banner.wav exists.)
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -z "${BANNER_PNG:-}" && -f "${HERE}/metadata/banner.png" ]] && BANNER_PNG="${HERE}/metadata/banner.png"
+[[ -z "${BANNER_WAV:-}" && -f "${HERE}/metadata/banner.wav" ]] && BANNER_WAV="${HERE}/metadata/banner.wav"
 BANNER_PNG="${BANNER_PNG:-${OUT}/banner.png}"
 BANNER_WAV="${BANNER_WAV:-${OUT}/silence.wav}"
 if [[ ! -f "${BANNER_PNG}" || ! -f "${BANNER_WAV}" ]]; then
@@ -72,8 +76,10 @@ raw = b''.join(b'\x00' + bytes([20, 60, 140]) * w for _ in range(h))
 def ch(t, d):
     c = struct.pack('>I', len(d)) + t + d
     return c + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
-open(png, 'wb').write(b'\x89PNG\r\n\x1a\n' + ch(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)) + ch(b'IDAT', zlib.compress(raw)) + ch(b'IEND', b''))
-f = wave.open(wav, 'wb'); f.setnchannels(2); f.setsampwidth(2); f.setframerate(32728); f.writeframes(b'\0' * 4 * 32728); f.close()
+import os
+if not os.path.exists(png): open(png, 'wb').write(b'\x89PNG\r\n\x1a\n' + ch(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)) + ch(b'IDAT', zlib.compress(raw)) + ch(b'IEND', b''))
+if not os.path.exists(wav):
+    f = wave.open(wav, 'wb'); f.setnchannels(2); f.setsampwidth(2); f.setframerate(32728); f.writeframes(b'\0' * 4 * 32728); f.close()
 PY
 fi
 "${BANNERTOOL}" makebanner -i "${BANNER_PNG}" -a "${BANNER_WAV}" -o "${OUT}/banner.bnr"
