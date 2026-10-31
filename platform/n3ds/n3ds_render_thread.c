@@ -15,6 +15,7 @@ static LightLock s_queueLock;
 static LightEvent s_workEvent;
 static LightEvent s_doneEvent;
 static int s_workerUp;
+static int s_workerStuck;
 
 static void (*s_workerMainFn)(void);
 
@@ -47,15 +48,14 @@ int N3DS_RenderWorkerStart(void (*workerMain)(void))
 	LightEvent_Init(&s_workEvent, RESET_STICKY);
 	LightEvent_Init(&s_doneEvent, RESET_STICKY);
 
-	isNew3DS = false;
-	APT_CheckNew3DS(&isNew3DS);
+	isNew3DS = N3DS_ExtraCoresUsable(); /* false on an Old 3DS and in the Old-3DS simulation */
 	if (!isNew3DS)
 	{
 		/* Target is New3DS-XL only, but fail safe rather than assume. Core 2
 		 * does not exist on old hardware, and core_id=-1 means "all CPUs"
 		 * (which resolves to core 0), never "any free core" -- same trap the
 		 * audio design doc documents for core 1. */
-		N3DS_DebugLog("[CTR-3DS] render worker: NO (APT says not New3DS) -- sync fallback");
+		N3DS_DebugLog("[CTR-3DS] render worker: NO (not a New3DS, or Old-3DS simulation) -- sync fallback");
 		return 0;
 	}
 
@@ -84,10 +84,26 @@ void N3DS_RenderWorkerStopAndJoin(void)
 		return;
 	}
 
-	threadJoin(s_renderThread, U64_MAX);
-	threadFree(s_renderThread);
+	/* Timed: a worker inside a GPU wait that never returns (HOME took the GPU)
+	 * must cost the exit 2 s, not the console. Stuck => left running, and
+	 * citro3d is then not torn down under it (N3DS_RenderWorkerStuck). */
+	if (threadJoin(s_renderThread, 2000000000ULL) == 0)
+	{
+		N3DS_ExitLog("render worker joined");
+		threadFree(s_renderThread);
+	}
+	else
+	{
+		s_workerStuck = 1;
+		N3DS_ExitLog("render worker did not end in 2 s, left running");
+	}
 	s_renderThread = NULL;
 	s_workerUp = 0;
+}
+
+int N3DS_RenderWorkerStuck(void)
+{
+	return s_workerStuck;
 }
 
 int N3DS_RenderWorkerIsSelf(void)

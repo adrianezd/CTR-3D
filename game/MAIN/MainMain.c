@@ -17,6 +17,10 @@
 #if defined(CTR_NATIVE)
 #include <platform/native_audio.h>
 #include <platform/native_log.h>
+#ifdef __3DS__
+unsigned int N3DS_SysMs(void);
+void N3DS_DebugLog(const char *msg);
+#endif
 // platform/native_options.c -- repoints unused LNG slots for the native
 // options menu once the language table exists (local-extern idiom).
 extern void NativeOptions_InstallStrings(void);
@@ -106,7 +110,21 @@ u32 main(void)
 		}
 #endif
 
+#ifdef __3DS__
+		unsigned int queueT0 = N3DS_SysMs();
+#endif
 		LOAD_NextQueuedFile();
+#ifdef __3DS__
+		{
+			unsigned int queueMs = N3DS_SysMs() - queueT0;
+			if (queueMs >= 250)
+			{
+				char line[64];
+				snprintf(line, sizeof(line), "[LOADPROF] queue stage=%d ms=%u", (int)sdata->Loading.stage, queueMs);
+				N3DS_DebugLog(line);
+			}
+		}
+#endif
 		// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8003c5d0-0x8003c5dc for per-frame XA pause handling.
 		CDSYS_XAPauseAtEnd();
 
@@ -300,7 +318,21 @@ u32 main(void)
 				// if something is being loaded
 				else
 				{
+#ifdef __3DS__
+					unsigned int loadT0 = N3DS_SysMs();
+#endif
 					sdata->Loading.stage = LOAD_TenStages(gGT, iVar8, sdata->ptrBigfile1);
+#ifdef __3DS__
+					{
+						unsigned int loadMs = N3DS_SysMs() - loadT0;
+						if (loadMs >= 250)
+						{
+							char line[64];
+							snprintf(line, sizeof(line), "[LOADPROF] stage=%d ms=%u", iVar8, loadMs);
+							N3DS_DebugLog(line);
+						}
+					}
+#endif
 
 					// If just finished loading stage 9
 					if (sdata->Loading.stage == LOAD_FINISHED)
@@ -375,6 +407,9 @@ u32 main(void)
 
 			// Start new frame (ClearOTagR)
 			MainFrame_ResetDB(gGT);
+
+			// 60fps: this frame's logic mode (include/ctr_fps60.h).
+			Fps60_BeginFrame(gGT);
 
 			if (
 			    // If you're in Demo Mode
@@ -476,7 +511,13 @@ u32 main(void)
 			// if mask is talking in Adventure Hub
 			if (sdata->boolDraw3D_AdvMask != 0)
 			{
-				AH_MaskHint_Update();
+				// 60fps: Aku/Uka hints are the 30 Hz world.
+				if (g_fps60Full)
+				{
+					Fps60_Enter30();
+					AH_MaskHint_Update();
+					Fps60_Leave30();
+				}
 			}
 #if defined(CTR_NATIVE) && defined(CTR_INTERNAL)
 			{
@@ -697,7 +738,11 @@ void StateZero()
 	// interactive). Must stay above Music_SetIntro for that reason.
 	//
 	// The MUSIC sector-count memo is table-fed and reads nothing, so what this
-	// holds for is the GAME and EXTRA voice-line cache and the crate extents.
+	// holds for is the crate extents. On 3DS the GAME and EXTRA voice-line
+	// cache is no longer read here: ~20k sectors held the logo for most of a
+	// 16 s boot, so the cache fills after boot in idle frame time instead
+	// (NativeAudio_VoiceCacheBackgroundStep, run by the frame pacer), and a
+	// line asked for before its track lands streams from the card.
 	{
 		enum
 		{

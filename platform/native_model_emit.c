@@ -7,6 +7,8 @@
  */
 
 #include "platform/native_model_emit.h"
+#include <stdarg.h>
+#include <stdio.h>
 
 #if defined(CTR_NATIVE) && defined(CTR_NATIVE_MODEL_RENDERER) && CTR_NATIVE_MODEL_RENDERER
 
@@ -146,6 +148,8 @@ struct NativeModelEmitInstance
 	 */
 	s16 alphaScale;
 	s32 fcR, fcG, fcB;
+	/* Debug dump only (dumpreq 'mdldump'): the world instance this record came from, for its names. */
+	const struct Instance *dbgWorld;
 };
 
 struct NativeModelEmitSnapshot
@@ -558,6 +562,7 @@ int NativeModelEmit_BeginInstance(const struct InstDrawPerPlayer *idpp, const st
 	 * site -- so the fade replay must not run on top of it. alphaScale 0 is
 	 * the existing "no fade" state. */
 	inst->alphaScale = specularLit ? 0 : idpp->alphaScale;
+	inst->dbgWorld = worldInst;
 	inst->fcR = (s32)CFC2(21);
 	inst->fcG = (s32)CFC2(22);
 	inst->fcB = (s32)CFC2(23);
@@ -1287,9 +1292,38 @@ internal int NativeModelDraw_FaceBlend(const struct NativeModelEmitFace *face, c
 	}
 }
 
+/* Temporary depth forensics (dumpreq 'mdldump', issue #14): one frame of the model path, every instance
+ * with its names and rows, then every triangle with its raw GTE vertices and the TRUE view depth the
+ * shader will use for each (dp4(qw, v) * hParam.x). Remove once the menu depth question is closed. */
+int g_dbg_mdlDump = 0;
+/* The CAPTURE button's target (n3ds_debuglink.c): when set, the dump goes to this file, which the dump
+ * closes, instead of the log. */
+FILE *g_dbg_mdlDumpFile = NULL;
+
+internal void MdlDumpLine(FILE *f, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	if (f != NULL)
+	{
+		vfprintf(f, fmt, args);
+	}
+	else
+	{
+		char text[512];
+
+		vsnprintf(text, sizeof(text), fmt, args);
+		Platform_LogInstrument("%s", text);
+	}
+	va_end(args);
+}
+
 void NativeModelDraw_IssueForWalk(void)
 {
 	const struct NativeModelEmitSnapshot *snap = &s_modelEmitBuf[s_modelEmitReadIdx];
+	const int dump = g_dbg_mdlDump;
+	FILE *const dumpFile = dump ? g_dbg_mdlDumpFile : NULL;
 	static u32 s_logCountdown = 512;
 	static u32 s_totalAppendFail = 0;
 	u32 drawsIssued = 0, trisDrawn = 0, instDrawn = 0, appendFailed = 0, blendTrisDrawn = 0, maskTrisDrawn = 0;
@@ -1308,6 +1342,11 @@ void NativeModelDraw_IssueForWalk(void)
 		return;
 	}
 
+	g_dbg_mdlDump = 0;
+	if (dump)
+	{
+		g_dbg_mdlDumpFile = NULL;
+	}
 	N3DS_ModelDraw_Begin();
 
 	/*
@@ -1353,6 +1392,43 @@ void NativeModelDraw_IssueForWalk(void)
 			continue;
 		}
 
+		if (dump && (pass == 0))
+		{
+			const struct Instance *w = inst->dbgWorld;
+
+			MdlDumpLine(dumpFile, "[MDLDUMP] inst %lu name=%.15s model=%.15s flags=%08x tris=%lu shift=%d under=%d h=%d hOut=%.1f "
+			                       "rot=(%d %d %d|%d %d %d|%d %d %d) t=(%d %d %d) wt=(%d %d %d) wscale=(%d %d %d)\n",
+			                       (unsigned long)i, (w != NULL) ? w->name : "-", ((w != NULL) && (w->model != NULL)) ? w->model->name : "-",
+			                       (w != NULL) ? (unsigned)w->flags : 0u, (unsigned long)inst->triCount, (int)inst->depthShift, (int)inst->paintUnder,
+			                       (int)inst->h, (double)h, inst->rot[0][0], inst->rot[0][1], inst->rot[0][2], inst->rot[1][0], inst->rot[1][1],
+			                       inst->rot[1][2], inst->rot[2][0], inst->rot[2][1], inst->rot[2][2], (int)inst->trans[0], (int)inst->trans[1],
+			                       (int)inst->trans[2], (w != NULL) ? (int)w->matrix.t[0] : 0, (w != NULL) ? (int)w->matrix.t[1] : 0,
+			                       (w != NULL) ? (int)w->matrix.t[2] : 0, (w != NULL) ? (int)w->scale.x : 0, (w != NULL) ? (int)w->scale.y : 0,
+			                       (w != NULL) ? (int)w->scale.z : 0);
+			for (t = 0; t < inst->triCount; t++)
+			{
+				const struct NativeModelEmitVert *d = &snap->verts[(inst->firstTri + t) * 3];
+				const struct NativeModelEmitFace *f = &snap->faces[inst->firstTri + t];
+				float z[3], sx = 0.0f, sy = 0.0f;
+				int v;
+
+				for (v = 0; v < 3; v++)
+				{
+					const float wv = (qw[0] * d[v].x) + (qw[1] * d[v].y) + (qw[2] * d[v].z) + qw[3];
+
+					z[v] = wv * h;
+					if (v == 0 && wv != 0.0f)
+					{
+						sx = ((qx[0] * d[0].x) + (qx[1] * d[0].y) + (qx[2] * d[0].z) + qx[3]) / wv;
+						sy = ((qy[0] * d[0].x) + (qy[1] * d[0].y) + (qy[2] * d[0].z) + qy[3]) / wv;
+					}
+				}
+				MdlDumpLine(dumpFile, "[MDLDUMP]  t%lu tex=%d tp=%04x cl=%04x s0=%d,%d v=(%d %d %d)(%d %d %d)(%d %d %d) z=%d,%d,%d\n", (unsigned long)t,
+				                       (int)f->textured, (unsigned)f->tpage, (unsigned)f->clut, (int)sx, (int)sy, d[0].x, d[0].y, d[0].z, d[1].x, d[1].y,
+				                       d[1].z, d[2].x, d[2].y, d[2].z, (int)z[0], (int)z[1], (int)z[2]);
+			}
+		}
+
 		/*
 		 * GHOST composite, mask half: under every one of its primitives the
 		 * ghost writer draws a flat B-F triangle of the scratch fade colour;
@@ -1370,10 +1446,25 @@ void NativeModelDraw_IssueForWalk(void)
 			for (t = 0; t < inst->triCount; t++)
 			{
 				const struct NativeModelEmitVert *src = &snap->verts[(inst->firstTri + t) * 3];
-				N3DS_Vertex out[3];
+				N3DS_Vertex *out;
 				int offset;
 				int v;
 
+				if (!instanceBound)
+				{
+					instanceBound = 1;
+					N3DS_ModelDraw_Instance(qx, qy, qw, h);
+					instDrawn++;
+				}
+
+				/* Written in place in the frame buffer (N3DS_C3DReserveVertices),
+				 * not built on the stack and copied: same bytes, same offset. */
+				out = N3DS_C3DReserveVertices(3, &offset);
+				if (out == NULL)
+				{
+					appendFailed++;
+					break;
+				}
 				for (v = 0; v < 3; v++)
 				{
 					out[v].x = src[v].x;
@@ -1386,20 +1477,6 @@ void NativeModelDraw_IssueForWalk(void)
 					out[v].g = inst->fadeG;
 					out[v].b = inst->fadeB;
 					out[v]._pad = 0;
-				}
-
-				if (!instanceBound)
-				{
-					instanceBound = 1;
-					N3DS_ModelDraw_Instance(qx, qy, qw, h);
-					instDrawn++;
-				}
-
-				offset = N3DS_C3DAppendVertices(out, 3);
-				if (offset < 0)
-				{
-					appendFailed++;
-					break;
 				}
 
 				if ((maskRun.triCount > 0) && (offset == (maskRun.startVertex + (maskRun.triCount * 3))))
@@ -1426,7 +1503,7 @@ void NativeModelDraw_IssueForWalk(void)
 			const struct NativeModelEmitVert *src = &snap->verts[triIndex * 3];
 			const int faceBlendMode = NativeModelDraw_FaceBlend(face, inst);
 			const int faceIsBlended = (faceBlendMode != 0);
-			N3DS_Vertex out[3];
+			N3DS_Vertex *out;
 			int atlasIdx = -1, pixelBaseU = 0, pixelBaseV = 0, originU = 0, originV = 0;
 			int textured = face->textured;
 			int offset;
@@ -1514,6 +1591,21 @@ void NativeModelDraw_IssueForWalk(void)
 				                            view, &atlasIdx, &pixelBaseU, &pixelBaseV, &originU, &originV);
 			}
 
+			/* Reserved AFTER the texture resolve, as the copy used to be, and
+			 * written in place (see the mask loop above). */
+			out = N3DS_C3DReserveVertices(3, &offset);
+
+			if (out == NULL)
+			{
+				/* Frame vertex budget exhausted. Counted and reported, never
+				 * silent -- a silent version of this is what once deleted
+				 * geometry with no log line at all (n3ds_backend.h's SIZING
+				 * comment). Stop this instance; later instances would fail the
+				 * same way. */
+				appendFailed++;
+				break;
+			}
+
 			for (v = 0; v < 3; v++)
 			{
 				out[v].x = src[v].x;
@@ -1546,19 +1638,6 @@ void NativeModelDraw_IssueForWalk(void)
 				out[v].g = src[v].g;
 				out[v].b = src[v].b;
 				out[v]._pad = 0;
-			}
-
-			offset = N3DS_C3DAppendVertices(out, 3);
-
-			if (offset < 0)
-			{
-				/* Frame vertex budget exhausted. Counted and reported, never
-				 * silent -- a silent version of this is what once deleted
-				 * geometry with no log line at all (n3ds_backend.h's SIZING
-				 * comment). Stop this instance; later instances would fail the
-				 * same way. */
-				appendFailed++;
-				break;
 			}
 
 			/* Extend the open run when this triangle is contiguous in the
@@ -1594,6 +1673,11 @@ void NativeModelDraw_IssueForWalk(void)
 	}
 
 	N3DS_ModelDraw_End();
+
+	if (dumpFile != NULL)
+	{
+		fclose(dumpFile);
+	}
 
 	s_totalAppendFail += appendFailed;
 

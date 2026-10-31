@@ -41,6 +41,8 @@
 #include <platform/native_renderer.h>
 
 #include "n3ds_backend.h"
+#include "n3ds_bottomui.h"
+#include <math.h>
 
 /*
  * PSX VRAM mirror: 1024x512 16-bit. native_renderer.c owns this on the host and
@@ -436,14 +438,10 @@ int g_dbg_mapBoth = 1;
  * the leg itself. */
 global_variable unsigned long s_mbTopCopyTris = 0;
 /*
- * Bottom-console visibility (dumpreq 'stats', default OFF -- release posture).
- * Gates every painter that writes glyphs into the bottom framebuffer: the
- * stats drip (N3DS_StatsDripRow) and Platform_Log's stdout echo
- * (native_log.c), both through N3DS_ConsolePaintAllowed. Composition, the
- * [PERF]/SD sinks and the netload stderr mirror are untouched -- only the
- * PANEL goes quiet. Boot text stays visible until the first present
- * (N3DS_GfxPresent wipes and arms the quiet then), so an asset error that
- * aborts before the game runs is still readable on the screen.
+ * Stats rows to the bottom UI's log view (dumpreq 'stats', default OFF -- release
+ * posture). The libctru console this used to gate is gone; with it off the
+ * stats block is still composed (the [PERF]/SD sinks and the netload stderr
+ * mirror are untouched), only the log-view echo of its rows is skipped.
  */
 int g_dbg_statsConsole = 0;
 /* Last measured fps x10 (the stats block's own 64-frame window number),
@@ -510,6 +508,34 @@ global_variable int s_btmfSegsPeak = 0;
 /* Last FPS-overlay window actually used (PSX units), for the activation log --
  * the clipped-F hunt needs the window the GPU really got, not the theory. */
 global_variable short s_btmfWinDbg[4];
+
+/*
+ * RACE HUD CLASS (PKTDEPTH_UI_STAMP_BTMHUD_BASE + group): the 1P HUD pieces the game marks per
+ * group (UI_RenderFrame.c). One list for all groups -- each segment remembers its group -- and
+ * one source box per group: the box of the latest frame that drew the group, kept while the group
+ * blinks off (s_btmhFBox accumulates a frame, s_btmhBox is what the layout reads). It must NOT be
+ * grow-only: animated pieces (pop-ins, the driver list sliding) only ever widen the union, which
+ * shrank the common scale and left the rank number all the room. The layout also quantises the
+ * scale (N3DS_BTMH_F_STEP) so a clock digit changing width does not rescale. The bottom pass fits each group's box into its own slot beside the map
+ * (N3DS_BtmHudSlot) through its own window, exactly like the FPS overlay does for itself.
+ */
+#define N3DS_BTMH_RUN_CAP 384
+#define N3DS_BTMH_MAX_SEGS 96
+global_variable N3DS_Vertex s_btmhRunVerts[N3DS_BTMH_RUN_CAP];
+global_variable int s_btmhRunUsed = 0;
+global_variable int s_btmhRunBlend = -1;
+global_variable int s_btmhRunDoubling = -1;
+global_variable int s_btmhRunAtlas = -1;
+global_variable int s_btmhRunGroup = -1;
+global_variable N3DS_MergeSegment s_btmhSegs[N3DS_BTMH_MAX_SEGS];
+global_variable u8 s_btmhSegGroup[N3DS_BTMH_MAX_SEGS];
+global_variable int s_btmhSegCount = 0;
+global_variable short s_btmhBox[PKTDEPTH_UI_HUD_GROUPS][4];
+global_variable int s_btmhHasBox[PKTDEPTH_UI_HUD_GROUPS];
+global_variable short s_btmhFBox[PKTDEPTH_UI_HUD_GROUPS][4]; /* this frame's accumulation */
+global_variable int s_btmhFHas[PKTDEPTH_UI_HUD_GROUPS];
+global_variable int s_btmhIdle[PKTDEPTH_UI_HUD_GROUPS];
+global_variable u32 s_btmhDropped = 0;
 
 /* Diagnostics for the stats block: draws emitted by the merge path split
  * by class, plus the events that cost extra draws or a mid-frame barrier. */
@@ -875,6 +901,27 @@ global_variable u32 s_vramCellGen[N3DS_VRAM_CELL_ROWS * N3DS_VRAM_CELL_COLS];
  * impossible by construction, and any thrashing is purely a capacity problem.
  */
 global_variable u32 s_vramDirtyBumps = 0;
+/*
+ * Track-preview video rectangle (set by the STR player, 16bpp, fixed for the
+ * life of a preview) and the count of VRAM writes that were NOT that rectangle.
+ * A decode-cache entry records s_vramOtherBumps when it decodes; if it is stale
+ * and the counter has not moved, the only thing that changed in VRAM since is
+ * the video rectangle, so re-decoding just its tiles reproduces a full re-decode
+ * exactly (the video page was ~25 ms/frame, twice, on an Old 3DS).
+ */
+global_variable int s_vidHintValid = 0;
+global_variable int s_vidX = 0, s_vidY = 0, s_vidW = 0, s_vidH = 0;
+global_variable u32 s_vramOtherBumps = 0;
+global_variable u32 s_texdecFramePart = 0;
+
+void NativeRenderer3DS_SetVideoRect(int x, int y, int w, int h)
+{
+	s_vidX = x;
+	s_vidY = y;
+	s_vidW = w;
+	s_vidH = h;
+	s_vidHintValid = (w > 0) && (h > 0);
+}
 
 internal int N3DS_VRAMCellIndex(int x, int y)
 {
@@ -902,6 +949,11 @@ internal void N3DS_DirtyVRAMRect(int x, int y, int w, int h)
 	if ((w <= 0) || (h <= 0))
 	{
 		return;
+	}
+
+	if (!(s_vidHintValid && (x == s_vidX) && (y == s_vidY) && (w == s_vidW) && (h == s_vidH)))
+	{
+		s_vramOtherBumps++;
 	}
 
 	x1 = x + w - 1;
@@ -1046,6 +1098,7 @@ internal void N3DS_RefreshFramebufferMirrorSlot(N3DS_FBStoreSlot *slot)
 				{
 					s_vramCellGen[(cellRow * N3DS_VRAM_CELL_COLS) + cellCol]++;
 					s_vramDirtyBumps++;
+					s_vramOtherBumps++;
 				}
 			}
 		}
@@ -1124,6 +1177,7 @@ typedef struct
 	                    * CLUT-less formats) -- the variant-retarget key, see
 	                    * N3DS_HashClutContent */
 	u32 lastUsedFrame;
+	u32 otherBumps;    /* s_vramOtherBumps when this cell was decoded (partial re-decode guard) */
 } N3DS_DecodeCacheEntry;
 
 /*
@@ -1135,7 +1189,16 @@ typedef struct
  * never entered into the LRU cache; indices 1..N3DS_TOTAL_CELLS-1 are real,
  * split between two tiers as of the sub-page cache below.
  */
-#define N3DS_TOTAL_CELLS (N3DS_ATLAS_COUNT * N3DS_ATLAS_CELLS_PER_ATLAS)
+/*
+ * The atlas count is chosen at init from the linear heap (N3DS_C3DAtlasCount:
+ * N3DS_ATLAS_MIN_COUNT..N3DS_ATLAS_COUNT, all of them on a New 3DS, fewer on a
+ * legacy Old 3DS region), so the cell totals below are runtime values; the
+ * arrays are sized for the maximum. The full-page tier keeps its 96 cells at
+ * every count: a smaller cache only shrinks the sub-page tier (see below).
+ */
+#define N3DS_TOTAL_CELLS_MAX (N3DS_ATLAS_COUNT * N3DS_ATLAS_CELLS_PER_ATLAS)
+global_variable int s_totalCells = N3DS_ATLAS_MIN_COUNT * N3DS_ATLAS_CELLS_PER_ATLAS; /* set by InitialiseRender */
+#define N3DS_TOTAL_CELLS (s_totalCells)
 #define N3DS_WHITE_ATLAS  0
 #define N3DS_WHITE_CELL_X 0
 #define N3DS_WHITE_CELL_Y 0
@@ -1175,16 +1238,24 @@ typedef struct
  * bumps and the full-page decodes that evict the live working set.
  */
 #define N3DS_FBCAP_RESERVED_CELLS       2
-#define N3DS_SUBPAGE_PHYSICAL_CELLS     (N3DS_TOTAL_CELLS - 1 - N3DS_FULLPAGE_RESERVED_CELLS - N3DS_FBCAP_RESERVED_CELLS)
 #define N3DS_SUBPAGE_CELLS_PER_PHYSICAL 16
-#define N3DS_SUBPAGE_TOTAL_CELLS        (N3DS_SUBPAGE_PHYSICAL_CELLS * N3DS_SUBPAGE_CELLS_PER_PHYSICAL)
+/* Runtime (the atlas count): 77 physical cells / 1232 slots with 11 atlases,
+ * 13 / 208 with the minimum 7 -- the measured sub-page peak is ~86 slots. */
+#define N3DS_SUBPAGE_PHYSICAL_CELLS     (N3DS_TOTAL_CELLS - 1 - N3DS_FULLPAGE_RESERVED_CELLS - N3DS_FBCAP_RESERVED_CELLS)
+#define N3DS_SUBPAGE_TOTAL_CELLS_MAX    ((N3DS_TOTAL_CELLS_MAX - 1 - N3DS_FULLPAGE_RESERVED_CELLS - N3DS_FBCAP_RESERVED_CELLS) * N3DS_SUBPAGE_CELLS_PER_PHYSICAL)
+global_variable int s_subPageTotalCells = 0; /* set by InitialiseRender */
+#define N3DS_SUBPAGE_TOTAL_CELLS        (s_subPageTotalCells)
 #define N3DS_SUBPAGE_DIM                64
 #define N3DS_SUBPAGE_PHYSICAL_BASE      (1 + N3DS_FULLPAGE_RESERVED_CELLS)
+/* The minimum atlas count must still leave the sub-page tier some cells. */
+CTR_STATIC_ASSERT(((N3DS_ATLAS_MIN_COUNT * N3DS_ATLAS_CELLS_PER_ATLAS) - 1 - N3DS_FULLPAGE_RESERVED_CELLS - N3DS_FBCAP_RESERVED_CELLS) >= 8);
 
+/* The capture cells are the last two of the last atlas. The cell total is a
+ * whole number of atlases, so their position inside that atlas is fixed. */
 #define N3DS_FBCAP_CELL_FIRST (N3DS_TOTAL_CELLS - N3DS_FBCAP_RESERVED_CELLS)
 #define N3DS_FBCAP_ATLAS      (N3DS_FBCAP_CELL_FIRST / N3DS_ATLAS_CELLS_PER_ATLAS)
-#define N3DS_FBCAP_CELL_X     ((N3DS_FBCAP_CELL_FIRST % N3DS_ATLAS_CELLS_PER_ATLAS) % N3DS_ATLAS_CELLS_PER_ROW)
-#define N3DS_FBCAP_CELL_Y     ((N3DS_FBCAP_CELL_FIRST % N3DS_ATLAS_CELLS_PER_ATLAS) / N3DS_ATLAS_CELLS_PER_ROW)
+#define N3DS_FBCAP_CELL_X     ((N3DS_ATLAS_CELLS_PER_ATLAS - N3DS_FBCAP_RESERVED_CELLS) % N3DS_ATLAS_CELLS_PER_ROW)
+#define N3DS_FBCAP_CELL_Y     ((N3DS_ATLAS_CELLS_PER_ATLAS - N3DS_FBCAP_RESERVED_CELLS) / N3DS_ATLAS_CELLS_PER_ROW)
 /* Atlas-texel origin of the capture region; the reserved cells must be
  * horizontally adjacent in ONE atlas for the region to be contiguous. */
 #define N3DS_FBCAP_REGION_X   (N3DS_FBCAP_CELL_X * N3DS_DECODE_TEXTURE_DIM)
@@ -1196,7 +1267,7 @@ CTR_STATIC_ASSERT((N3DS_FBCAP_CELL_X + N3DS_FBCAP_RESERVED_CELLS) <= N3DS_ATLAS_
  * (N3DS_FullPageCellBound below), so the A/B isn't confounded by
  * eviction thrash -- 96 cells hold less than one busy scene's working set,
  * which is exactly what invalidated the first run of that experiment. */
-global_variable N3DS_DecodeCacheEntry s_decodeCache[N3DS_TOTAL_CELLS];
+global_variable N3DS_DecodeCacheEntry s_decodeCache[N3DS_TOTAL_CELLS_MAX];
 
 internal int N3DS_FullPageCellBound(void)
 {
@@ -1238,7 +1309,7 @@ typedef struct
 	u32 lastUsedFrame;
 } N3DS_SubPageCacheEntry;
 
-global_variable N3DS_SubPageCacheEntry s_subPageCache[N3DS_SUBPAGE_TOTAL_CELLS];
+global_variable N3DS_SubPageCacheEntry s_subPageCache[N3DS_SUBPAGE_TOTAL_CELLS_MAX];
 /* Mirrors s_lastCellHit. -1 = no memo yet -- unlike the full-page array, index
  * 0 is a real, valid sub-page slot here (no reserved white cell at 0), so 0
  * can't double as the "no memo" sentinel the way it implicitly does not for
@@ -2230,13 +2301,48 @@ decodeIntoSlot:
 		 * GL_REPEAT). destStrideTiles stays N3DS_DECODE_TEXTURE_DIM/8, the
 		 * destination scratch's own width in tiles.
 		 */
+		/* Partial re-decode of the track-preview video rectangle: only when this
+		 * slot already holds exactly this (page, clut, format, view) and no VRAM
+		 * write other than the video rectangle has happened since it was decoded
+		 * (see s_vramOtherBumps). 16bpp only: a texel is one VRAM word. */
+		int partTx0 = 0, partTy0 = 0, partTw = 0, partTh = 0;
+		int partial = 0;
+
+		if ((oldestSlot == staleMatchSlot) && s_vidHintValid && (format == TF_16_BIT) && s_decodeCache[oldestSlot].used &&
+		    (s_decodeCache[oldestSlot].otherBumps == s_vramOtherBumps))
+		{
+			const int pageOriginX = (texPage & 0xF) * 64;
+			const int pageOriginY = (texPage & 0x10) ? 256 : 0;
+			int pu = s_vidX - pageOriginX;
+			const int pv = s_vidY - pageOriginY;
+
+			if (pu < 0)
+			{
+				pu += VRAM_WIDTH;
+			}
+			if ((pu >= 0) && ((pu + s_vidW) <= N3DS_DECODE_TEXTURE_DIM) && (pv >= 0) && ((pv + s_vidH) <= N3DS_DECODE_TEXTURE_DIM))
+			{
+				partTx0 = pu >> 3;
+				partTy0 = pv >> 3;
+				partTw = ((pu + s_vidW + 7) >> 3) - partTx0;
+				partTh = ((pv + s_vidH + 7) >> 3) - partTy0;
+				partial = 1;
+			}
+		}
 		{
 			const int decodeWidth = N3DS_DECODE_TEXTURE_DIM;
 			const unsigned long long texdecT0 = N3DS_GetTickCount();
 
 			texdecEventT0 = texdecT0;
-			N3DS_DecodeAndTilePage(texPage, clut, format, view, 0, 0, decodeWidth, N3DS_DECODE_TEXTURE_DIM,
-			                        N3DS_DECODE_TEXTURE_DIM / 8, s_decodeScratch);
+			if (partial)
+			{
+				N3DS_DecodeAndTilePage(texPage, clut, format, view, partTx0 * 8, partTy0 * 8, partTw * 8, partTh * 8, partTw, s_decodeScratch);
+			}
+			else
+			{
+				N3DS_DecodeAndTilePage(texPage, clut, format, view, 0, 0, decodeWidth, N3DS_DECODE_TEXTURE_DIM,
+				                        N3DS_DECODE_TEXTURE_DIM / 8, s_decodeScratch);
+			}
 			s_texdecFrameDecTicks += N3DS_GetTickCount() - texdecT0;
 		}
 		{
@@ -2245,7 +2351,15 @@ decodeIntoSlot:
 			unsigned long long texdecT2;
 
 			N3DS_CellIndexToAtlasCoord(oldestSlot, &atlasIdx, &cellX, &cellY);
-			N3DS_C3DUploadDecodedCell(atlasIdx, cellX, cellY, s_decodeScratch);
+			if (partial)
+			{
+				N3DS_C3DUploadDecodedTiles(atlasIdx, cellX, cellY, partTx0, partTy0, partTw, partTh, s_decodeScratch);
+				s_texdecFramePart++;
+			}
+			else
+			{
+				N3DS_C3DUploadDecodedCell(atlasIdx, cellX, cellY, s_decodeScratch);
+			}
 			texdecT2 = N3DS_GetTickCount();
 			s_texdecFrameUpTicks += texdecT2 - texdecT1;
 			s_texdecFrameFull++;
@@ -2275,6 +2389,7 @@ decodeIntoSlot:
 	}
 	s_decodeCache[oldestSlot].clutHash = curClutHash;
 	s_decodeCache[oldestSlot].lastUsedFrame = s_frameCounter;
+	s_decodeCache[oldestSlot].otherBumps = s_vramOtherBumps;
 	s_fullPageHashIdx[hashBucket] = (s16)oldestSlot;
 
 	return oldestSlot;
@@ -3255,6 +3370,350 @@ internal N3DS_Vertex *N3DS_BtmFpsAppend(int blendMode, int doubling, int atlas)
 	return dst;
 }
 
+/* Race-HUD twin of the pairs above (see the s_btmh* block). */
+internal void N3DS_BtmHudCloseRun(void)
+{
+	int baseVertex;
+
+	if (s_btmhRunUsed <= 0)
+	{
+		s_btmhRunAtlas = -1;
+		return;
+	}
+	if (s_btmhSegCount >= N3DS_BTMH_MAX_SEGS)
+	{
+		s_btmhDropped += (u32)(s_btmhRunUsed / 3);
+		s_btmhRunUsed = 0;
+		s_btmhRunAtlas = -1;
+		return;
+	}
+	baseVertex = N3DS_TvboCheckedAppend(s_btmhRunVerts, s_btmhRunUsed);
+	if (baseVertex < 0)
+	{
+		s_btmhDropped += (u32)(s_btmhRunUsed / 3);
+	}
+	else
+	{
+		N3DS_MergeSegment *seg = &s_btmhSegs[s_btmhSegCount];
+		const int g = s_btmhRunGroup;
+		int k;
+
+		seg->blendMode = (u8)s_btmhRunBlend;
+		seg->doubling = (u8)s_btmhRunDoubling;
+		seg->atlas = (u8)s_btmhRunAtlas;
+		seg->baseVertex = baseVertex;
+		seg->vertCount = s_btmhRunUsed;
+		s_btmhSegGroup[s_btmhSegCount] = (u8)g;
+		s_btmhSegCount++;
+
+		for (k = 0; k < s_btmhRunUsed; k++)
+		{
+			const short vx = (short)s_btmhRunVerts[k].x;
+			const short vy = (short)s_btmhRunVerts[k].y;
+
+			if (!s_btmhFHas[g])
+			{
+				s_btmhFBox[g][0] = vx;
+				s_btmhFBox[g][1] = vy;
+				s_btmhFBox[g][2] = vx;
+				s_btmhFBox[g][3] = vy;
+				s_btmhFHas[g] = 1;
+			}
+			else
+			{
+				if (vx < s_btmhFBox[g][0]) { s_btmhFBox[g][0] = vx; }
+				if (vy < s_btmhFBox[g][1]) { s_btmhFBox[g][1] = vy; }
+				if (vx > s_btmhFBox[g][2]) { s_btmhFBox[g][2] = vx; }
+				if (vy > s_btmhFBox[g][3]) { s_btmhFBox[g][3] = vy; }
+			}
+		}
+	}
+	s_btmhRunUsed = 0;
+	s_btmhRunAtlas = -1;
+}
+
+internal N3DS_Vertex *N3DS_BtmHudAppend(int group, int blendMode, int doubling, int atlas)
+{
+	N3DS_Vertex *dst;
+
+	if ((group != s_btmhRunGroup) || (atlas != s_btmhRunAtlas) || (blendMode != s_btmhRunBlend) || (doubling != s_btmhRunDoubling) ||
+	    ((s_btmhRunUsed + 3) > N3DS_BTMH_RUN_CAP))
+	{
+		N3DS_BtmHudCloseRun();
+		s_btmhRunGroup = group;
+		s_btmhRunBlend = blendMode;
+		s_btmhRunDoubling = doubling;
+		s_btmhRunAtlas = atlas;
+	}
+	if ((s_btmhRunUsed + 3) > N3DS_BTMH_RUN_CAP)
+	{
+		s_btmhDropped++;
+		return NULL;
+	}
+	dst = &s_btmhRunVerts[s_btmhRunUsed];
+	s_btmhRunUsed += 3;
+	return dst;
+}
+
+/*
+ * Where the HUD groups sit in the bottom panel's content area (320 x 212 px), at ONE common scale.
+ * Each group goes to the corner its own on-screen position is nearest to -- the display's centre
+ * decides left/right and top/bottom -- the way retail lays the HUD out on the top screen; the map
+ * takes the middle. Groups sharing a corner stack.
+ * rect[g] = x, y, w, h in panel px; present[g] says whether the group exists this frame.
+ */
+#define N3DS_BTMH_GAP 6
+#define N3DS_BTMH_FPS_H 4
+#define N3DS_BTMH_G_RANK 1
+#define N3DS_BTMH_G_WUMPA 4
+#define N3DS_BTMH_G_WEAPON 6 /* the held item: right column, between the fruit and the speedometer */
+#define N3DS_BTMH_G_LIST 7 /* the ranked-driver list (retail rows 1..4) */
+#define N3DS_BTMH_G_LISTX 8 /* the list's extra rows 5..8, bottom screen only */
+#define N3DS_BTMH_G_TOPONLY 10 /* retail's small ranking digits: peeled so the top copy keeps them, never drawn below */
+#define N3DS_BTMH_G_LISTBAR 9 /* the player's highlight bar, bottom screen only, drawn before every other group */
+#define N3DS_BTMH_CORNER_W 100
+#define N3DS_BTMH_F_STEP 0.03125f
+
+internal void N3DS_BtmHudLayout(int dspW, int dspH, float rect[PKTDEPTH_UI_HUD_GROUPS][4], int present[PKTDEPTH_UI_HUD_GROUPS])
+{
+	const float bx = 320.0f / (float)dspW;
+	const float by = 240.0f / (float)dspH;
+	const float H = (float)N3DS_BOTTOM_CONTENT_H;
+	float pw[PKTDEPTH_UI_HUD_GROUPS];
+	float ph[PKTDEPTH_UI_HUD_GROUPS];
+	int corner[PKTDEPTH_UI_HUD_GROUPS];
+	float sumH[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	int cnt[4] = {0, 0, 0, 0};
+	float f = 1.5f;
+	float maxW = 1.0f;
+	int rankUnderList;
+	short listU[4] = {0, 0, 0, 0};
+	float listRight = 0.0f;
+	int g;
+	int c;
+
+	/* This frame's box replaces the latched one for every group drawn this frame. */
+	for (g = 1; g < (int)PKTDEPTH_UI_HUD_GROUPS; g++)
+	{
+		if (s_btmhFHas[g])
+		{
+			memcpy(s_btmhBox[g], s_btmhFBox[g], sizeof(s_btmhBox[g]));
+			s_btmhHasBox[g] = 1;
+		}
+	}
+	/* The ranking has a FIXED box: its icons swing sideways whenever two drivers swap, and a measured box
+	 * would make the whole list (and the common scale) breathe. Its three groups share the one window. */
+	if (s_btmhHasBox[N3DS_BTMH_G_LIST])
+	{
+		const int rows = s_btmhHasBox[N3DS_BTMH_G_LISTX] ? 8 : 4;
+		/* The box is in vertex space: the UI band's widescreen X ramp has already moved the vertices. */
+		extern int NativeWide_UiShiftX(int x);
+		const short fixedBox[4] = {(short)NativeWide_UiShiftX(4), 0x36, (short)NativeWide_UiShiftX(0x56), (short)(0x36 + (rows * 27) + 2)};
+
+		memcpy(s_btmhBox[N3DS_BTMH_G_LIST], fixedBox, sizeof(fixedBox));
+		memcpy(s_btmhBox[N3DS_BTMH_G_LISTX], fixedBox, sizeof(fixedBox));
+		memcpy(s_btmhBox[N3DS_BTMH_G_LISTBAR], fixedBox, sizeof(fixedBox));
+	}
+	for (g = 1; g < (int)PKTDEPTH_UI_HUD_GROUPS; g++)
+	{
+		/* Some pieces read better off the common scale (the fruit smaller, the rank when it has no list). */
+		const float m = (g == N3DS_BTMH_G_RANK) ? 0.7f : (g == N3DS_BTMH_G_WUMPA) ? 0.9f : 1.0f;
+
+		present[g] = s_btmhHasBox[g] && (g != N3DS_BTMH_G_TOPONLY);
+		if (!present[g])
+		{
+			continue;
+		}
+		pw[g] = (float)(s_btmhBox[g][2] - s_btmhBox[g][0]) * bx * m;
+		ph[g] = (float)(s_btmhBox[g][3] - s_btmhBox[g][1]) * by * m;
+		if (ph[g] < 1.0f) { ph[g] = 1.0f; }
+		if (g == N3DS_BTMH_G_LIST)
+		{
+			corner[g] = 2; /* the driver list is a bottom-left piece */
+		}
+		else
+		{
+			const int right = ((s_btmhBox[g][0] + s_btmhBox[g][2]) * 0.5f) > ((float)dspW * 0.5f);
+			const int bottom = ((s_btmhBox[g][1] + s_btmhBox[g][3]) * 0.5f) > ((float)dspH * 0.5f);
+
+			corner[g] = (bottom ? 2 : 0) + (right ? 1 : 0);
+		}
+	}
+
+	/* The extra rows continue the list: one piece for the layout, the two boxes sit in it at their own offsets. */
+	if (!present[N3DS_BTMH_G_LIST])
+	{
+		present[N3DS_BTMH_G_LISTX] = 0;
+		present[N3DS_BTMH_G_LISTBAR] = 0;
+	}
+	corner[N3DS_BTMH_G_LISTBAR] = -1;
+	if (present[N3DS_BTMH_G_LIST])
+	{
+		const short *a = s_btmhBox[N3DS_BTMH_G_LIST];
+		const short *b = s_btmhBox[N3DS_BTMH_G_LISTX];
+
+		listU[0] = (a[0] < b[0]) ? a[0] : b[0];
+		listU[1] = (a[1] < b[1]) ? a[1] : b[1];
+		listU[2] = (a[2] > b[2]) ? a[2] : b[2];
+		listU[3] = (a[3] > b[3]) ? a[3] : b[3];
+		pw[N3DS_BTMH_G_LIST] = (float)(listU[2] - listU[0]) * bx;
+		ph[N3DS_BTMH_G_LIST] = (float)(listU[3] - listU[1]) * by;
+		corner[N3DS_BTMH_G_LISTX] = -1;
+	}
+
+	/* With the driver list up, the player's own rank number goes BESIDE it, as big as the room left
+	 * in the left column allows (below). Without a list it is an ordinary corner piece. */
+	rankUnderList = present[N3DS_BTMH_G_LIST] && present[N3DS_BTMH_G_RANK];
+	if (rankUnderList)
+	{
+		corner[N3DS_BTMH_G_RANK] = -1;
+	}
+	if (present[N3DS_BTMH_G_WEAPON])
+	{
+		corner[N3DS_BTMH_G_WEAPON] = -1; /* placed on its own below */
+		if (pw[N3DS_BTMH_G_WEAPON] > maxW) { maxW = pw[N3DS_BTMH_G_WEAPON]; }
+	}
+	for (g = 1; g < (int)PKTDEPTH_UI_HUD_GROUPS; g++)
+	{
+		if (!present[g] || (corner[g] < 0))
+		{
+			continue;
+		}
+		sumH[corner[g]] += ph[g];
+		cnt[corner[g]]++;
+		if (pw[g] > maxW) { maxW = pw[g]; }
+	}
+
+	/* One scale for everything: the widest piece fits its column, and every stack fits its height. */
+	f = fminf(f, (float)N3DS_BTMH_CORNER_W / maxW);
+	for (c = 0; c < 4; c++)
+	{
+		if ((cnt[c] > 0) && !(present[N3DS_BTMH_G_LIST] && (c == 2)))
+		{
+			const float avail = ((H - (float)N3DS_BTMH_FPS_H) * 0.5f) - (float)((cnt[c] - 1) * N3DS_BTMH_GAP);
+
+			f = fminf(f, avail / sumH[c]);
+		}
+	}
+	if (present[N3DS_BTMH_G_LIST])
+	{
+		/* The left column (top-left stack, then the whole ranking) takes the panel's full height. */
+		const int gaps = ((cnt[0] > 1) ? (cnt[0] - 1) : 0) + ((cnt[2] > 1) ? (cnt[2] - 1) : 0) + ((cnt[0] > 0) ? 1 : 0);
+		const float availL = H - 4.0f - (float)N3DS_BTMH_FPS_H - (float)(gaps * N3DS_BTMH_GAP);
+
+		f = fminf(f, availL / (sumH[0] + sumH[2]));
+	}
+
+	f = floorf(f / N3DS_BTMH_F_STEP) * N3DS_BTMH_F_STEP;
+	if (f < N3DS_BTMH_F_STEP) { f = N3DS_BTMH_F_STEP; }
+
+	for (c = 0; c < 4; c++)
+	{
+		const int right = c & 1;
+		const int bottom = c >> 1;
+		float stack = sumH[c] * f + (float)((cnt[c] > 0 ? cnt[c] - 1 : 0) * N3DS_BTMH_GAP);
+		float y = bottom ? (H - 4.0f - stack) : (float)N3DS_BTMH_FPS_H;
+
+		if (present[N3DS_BTMH_G_LIST] && (c == 2))
+		{
+			/* Left column: straight on below the top-left stack, not anchored to the bottom. */
+			y = (float)N3DS_BTMH_FPS_H + (sumH[0] * f) + (float)((cnt[0] > 0 ? cnt[0] - 1 : 0) * N3DS_BTMH_GAP) + (cnt[0] > 0 ? (float)N3DS_BTMH_GAP : 0.0f);
+		}
+		for (g = 1; g < (int)PKTDEPTH_UI_HUD_GROUPS; g++)
+		{
+			if (!present[g] || (corner[g] != c))
+			{
+				continue;
+			}
+			rect[g][2] = pw[g] * f;
+			rect[g][3] = ph[g] * f;
+			rect[g][0] = right ? (317.0f - rect[g][2]) : 3.0f;
+			rect[g][1] = y;
+			y += rect[g][3] + (float)N3DS_BTMH_GAP;
+		}
+	}
+
+	if (present[N3DS_BTMH_G_WEAPON])
+	{
+		/* Right column, centred in the gap between the top-right stack and the bottom-right stack. */
+		const float top = (float)N3DS_BTMH_FPS_H + (sumH[1] * f) + (float)((cnt[1] > 0 ? cnt[1] : 0) * N3DS_BTMH_GAP);
+		const float bot = (H - 4.0f) - (sumH[3] * f) - (float)((cnt[3] > 0 ? cnt[3] : 0) * N3DS_BTMH_GAP);
+		const float w = pw[N3DS_BTMH_G_WEAPON] * f;
+		const float h = ph[N3DS_BTMH_G_WEAPON] * f;
+
+		rect[N3DS_BTMH_G_WEAPON][2] = w;
+		rect[N3DS_BTMH_G_WEAPON][3] = h;
+		rect[N3DS_BTMH_G_WEAPON][0] = 317.0f - w;
+		rect[N3DS_BTMH_G_WEAPON][1] = top + ((bot - top) - h) * 0.5f;
+	}
+	if (present[N3DS_BTMH_G_LIST])
+	{
+		/* rect[list] is the whole ranking; each of its two boxes sits in it at its own offset. */
+		const float ux = rect[N3DS_BTMH_G_LIST][0];
+		const float uy = rect[N3DS_BTMH_G_LIST][1];
+		const int parts[3] = {N3DS_BTMH_G_LIST, N3DS_BTMH_G_LISTX, N3DS_BTMH_G_LISTBAR};
+		int k;
+
+		listRight = ux + rect[N3DS_BTMH_G_LIST][2];
+		for (k = 0; k < 3; k++)
+		{
+			const short *bb = s_btmhBox[parts[k]];
+
+			if (!present[parts[k]])
+			{
+				continue;
+			}
+			rect[parts[k]][0] = ux + (float)(bb[0] - listU[0]) * bx * f;
+			rect[parts[k]][1] = uy + (float)(bb[1] - listU[1]) * by * f;
+			rect[parts[k]][2] = (float)(bb[2] - bb[0]) * bx * f;
+			rect[parts[k]][3] = (float)(bb[3] - bb[1]) * by * f;
+		}
+	}
+	if (rankUnderList)
+	{
+		/* The player's rank number: bottom-left, right of the ranking, shrunk so it stays clear of the map. */
+		const float rw = (float)(s_btmhBox[N3DS_BTMH_G_RANK][2] - s_btmhBox[N3DS_BTMH_G_RANK][0]) * bx;
+		const float rh = (float)(s_btmhBox[N3DS_BTMH_G_RANK][3] - s_btmhBox[N3DS_BTMH_G_RANK][1]) * by;
+		const float x0 = listRight + 4.0f;
+		float sr = ((float)(N3DS_BTMH_CORNER_W + 4) - x0) / ((rw < 1.0f) ? 1.0f : rw);
+
+		sr = fminf(sr, (float)(H * 0.4f) / ((rh < 1.0f) ? 1.0f : rh));
+		sr = fminf(sr, 1.0f);
+		if (sr < 0.1f) { sr = 0.1f; }
+		rect[N3DS_BTMH_G_RANK][2] = rw * sr;
+		rect[N3DS_BTMH_G_RANK][3] = rh * sr;
+		rect[N3DS_BTMH_G_RANK][0] = x0;
+		rect[N3DS_BTMH_G_RANK][1] = (H - 4.0f) - (rh * sr);
+	}
+}
+
+/* The window (PSX units) that lands box at the largest uniform scale (up to maxScale times the
+ * panel's base scale) that fits the panel rect dx,dy,dw,dh, centred in it. The PSX units are
+ * anamorphic (see the map's window comment), so the two axes use the display's own ratio. */
+internal void N3DS_BtmFitWindow(const short *box, int dx, int dy, int dw, int dh, float maxScale, int dspW, int dspH, float *l, float *r, float *t,
+                                float *b)
+{
+	const float bx = 320.0f / (float)dspW;
+	const float by = 240.0f / (float)dspH;
+	float bw = (float)(box[2] - box[0]);
+	float bh = (float)(box[3] - box[1]);
+	float f;
+	float fy;
+	const float cx = (float)(box[0] + box[2]) * 0.5f;
+	const float cy = (float)(box[1] + box[3]) * 0.5f;
+
+	if (bw < 1.0f) { bw = 1.0f; }
+	if (bh < 1.0f) { bh = 1.0f; }
+	f = (float)dw / (bw * bx);
+	fy = (float)dh / (bh * by);
+	if (fy < f) { f = fy; }
+	if (f > maxScale) { f = maxScale; }
+	*l = cx - ((float)dx + (float)dw * 0.5f) / (f * bx);
+	*r = *l + 320.0f / (f * bx);
+	*t = cy - ((float)dy + (float)dh * 0.5f) / (f * by);
+	*b = *t + (float)N3DS_BOTTOM_CONTENT_H / (f * by);
+}
+
 /*
  * Draw the frame's UI, in submission order, LAST -- after the merge barrier, the
  * model pass and the deferred smoke, so nothing can paint over it. Every prim
@@ -3345,10 +3804,12 @@ internal void N3DS_DrawBottomMapPass(void)
 {
 	int mapActive;
 	int fpsActive;
+	int hudActive;
 	int active;
 
 	N3DS_BtmMapCloseRun();
 	N3DS_BtmFpsCloseRun();
+	N3DS_BtmHudCloseRun();
 
 	if (s_btmmSegCount > s_btmmSegsPeak)
 	{
@@ -3367,8 +3828,15 @@ internal void N3DS_DrawBottomMapPass(void)
 	 * surface, and with this pass owning the panel every frame it effectively
 	 * never paints again. */
 	fpsActive = (s_btmfSegCount > 0) && s_btmfFrameHasBox && g_dbg_btmMap;
-	active = mapActive || fpsActive;
-	if (active)
+	hudActive = (s_btmhSegCount > 0) && g_dbg_btmMap;
+	/* The bottom screen belongs to the UI (n3ds_bottomui.c); the minimap and the
+	 * FPS overlay are the MAPA tab's content. A race map existing is reported
+	 * to the UI (it brings MAPA up once per race); they are DRAWN only while
+	 * that tab is the selected one -- their segments were already peeled off the
+	 * top screen at record time, so on another tab they are simply not shown. */
+	N3DS_BottomUi_MapLive(mapActive);
+	active = (mapActive || fpsActive || hudActive) && N3DS_BottomUi_MapTabActive();
+	if (N3DS_BottomPass_Wanted(active) && N3DS_BottomPass_Begin())
 	{
 		const int dspW = (s_projectionDispW > 0) ? s_projectionDispW : 512;
 		const int dspH = (s_projectionDispH > 0) ? s_projectionDispH : 216;
@@ -3458,14 +3926,27 @@ internal void N3DS_DrawBottomMapPass(void)
 				wl -= grow / 2;
 				wr += grow - (grow / 2);
 			}
+
+			if (hudActive)
+			{
+				/* The race HUD takes the panel's corners: the map's box lands in the middle, at the same aspect. */
+				float fl, fr, ft, fb;
+
+				N3DS_BtmFitWindow(s_btmmWin, N3DS_BTMH_CORNER_W + 4, 0, 320 - (2 * (N3DS_BTMH_CORNER_W + 4)), N3DS_BOTTOM_CONTENT_H, 1.6f, dspW, dspH, &fl, &fr, &ft, &fb);
+				wl = (int)fl;
+				wr = (int)fr;
+				wt = (int)ft;
+				wb = (int)fb;
+			}
 		}
 
-		if (N3DS_BottomMapDraw_Begin((float)wl, (float)wr, (float)wt, (float)wb))
+		if (active)
 		{
 			int lastDoubling = -1;
 			int lastDepthWrite = -1;
 			int i;
 
+			N3DS_BottomMapDraw_Begin((float)wl, (float)wr, (float)wt, (float)wb);
 			for (i = 0; i < s_btmmSegCount; i++)
 			{
 				const N3DS_MergeSegment *seg = &s_btmmSegs[i];
@@ -3496,10 +3977,12 @@ internal void N3DS_DrawBottomMapPass(void)
 				 * than the map's, so it wins the depth test over the map
 				 * pixels it overlays. */
 				const float fscale = 1.0f;
+				/* Height scaled for the content viewport (the tab bar takes
+				 * the rest of the panel), so a pixel stays square. */
 				const float fw = (float)dspW / fscale;
-				const float fh = (float)dspH / fscale;
+				const float fh = ((float)dspH / fscale) * ((float)N3DS_BOTTOM_CONTENT_H / 240.0f);
 				const float fl = (float)s_btmfFrameBox[2] - fw + (6.0f * fw / 320.0f);
-				const float ft = (float)s_btmfFrameBox[1] - (4.0f * fh / 240.0f);
+				const float ft = (float)s_btmfFrameBox[1] - (4.0f * fh / (float)N3DS_BOTTOM_CONTENT_H);
 
 				s_btmfWinDbg[0] = (short)fl;
 				s_btmfWinDbg[1] = (short)ft;
@@ -3526,20 +4009,76 @@ internal void N3DS_DrawBottomMapPass(void)
 					N3DS_C3DDrawTriangles(seg->baseVertex, seg->vertCount / 3);
 				}
 			}
-			N3DS_BottomMapDraw_End();
+			if (hudActive)
+			{
+				float rect[PKTDEPTH_UI_HUD_GROUPS][4];
+				int present[PKTDEPTH_UI_HUD_GROUPS] = {0};
+				int g;
+				int order;
+
+				N3DS_BtmHudLayout(dspW, dspH, rect, present);
+				for (order = 0; order < (int)PKTDEPTH_UI_HUD_GROUPS - 1; order++)
+				{
+					float fl, fr, ft, fb;
+					int i;
+
+					/* The highlight bar goes first (behind the ranking's icons), then 1..8 in order. */
+					if (order >= N3DS_BTMH_G_LISTBAR)
+					{
+						continue; /* the top-only group is not drawn here */
+					}
+					g = (order == 0) ? N3DS_BTMH_G_LISTBAR : order;
+
+					if (!present[g])
+					{
+						continue;
+					}
+					/* The rect is exactly the group's box at the common scale, so the fit lands it there. */
+					N3DS_BtmFitWindow(s_btmhBox[g], (int)(rect[g][0] + 0.5f), (int)(rect[g][1] + 0.5f), (int)(rect[g][2] + 0.5f), (int)(rect[g][3] + 0.5f),
+					                  3.0f, dspW, dspH, &fl, &fr, &ft, &fb);
+					N3DS_BottomMapDraw_SetWindow(fl, fr, ft, fb);
+					for (i = 0; i < s_btmhSegCount; i++)
+					{
+						const N3DS_MergeSegment *seg = &s_btmhSegs[i];
+						const int wantWrite = ((seg->blendMode != 0) && g_dbg_fxNoDepthWrite) ? 0 : 1;
+
+						if ((int)s_btmhSegGroup[i] != g)
+						{
+							continue;
+						}
+						if ((int)seg->doubling != lastDoubling)
+						{
+							N3DS_C3DSetColorDoubling((int)seg->doubling);
+							lastDoubling = (int)seg->doubling;
+						}
+						if (wantWrite != lastDepthWrite)
+						{
+							N3DS_C3DSetDepthWrite(wantWrite);
+							lastDepthWrite = wantWrite;
+						}
+						N3DS_C3DSetBlendMode((int)seg->blendMode);
+						N3DS_C3DBindAtlas((int)seg->atlas);
+						N3DS_C3DDrawTriangles(seg->baseVertex, seg->vertCount / 3);
+					}
+				}
+			}
 			/* This pass touched doubling/depth-write/blend behind the
 			 * frame memos; force the next frame's first consumer to
 			 * reassert, same rule as the UI pass above. */
 			s_mergeDepthWriteState = -1;
 		}
-		else
-		{
-			/* No bottom target (allocation failed, logged by the backend):
-			 * stop retagging so the map returns to the top screen instead
-			 * of vanishing. */
-			g_dbg_btmMap = 0;
-			active = 0;
-		}
+		N3DS_BottomPass_End();
+		/* The UI quad also set doubling/depth-write/blend and the texture. */
+		s_mergeDepthWriteState = -1;
+		s_runUntextured = -1;
+	}
+	else if (active)
+	{
+		/* No bottom target/texture (allocation failed, logged by the backend):
+		 * stop retagging so the map returns to the top screen instead of
+		 * vanishing. */
+		g_dbg_btmMap = 0;
+		active = 0;
 	}
 
 	if (active != s_btmmWasActive)
@@ -3589,6 +4128,27 @@ internal void N3DS_DrawBottomMapPass(void)
 	s_btmmFrameHasBox = 0;
 	s_btmfSegCount = 0;
 	s_btmfFrameHasBox = 0;
+	{
+		int seen[PKTDEPTH_UI_HUD_GROUPS] = {0};
+		int g;
+
+		for (g = 0; g < s_btmhSegCount; g++)
+		{
+			seen[s_btmhSegGroup[g]] = 1;
+		}
+		/* A group's latched box outlives its frames, but not the race: 90 frames without the
+		 * group (a finished race, a menu, a pause) and it starts over. */
+		for (g = 1; g < (int)PKTDEPTH_UI_HUD_GROUPS; g++)
+		{
+			s_btmhIdle[g] = seen[g] ? 0 : (s_btmhIdle[g] + 1);
+			if (s_btmhIdle[g] > 90)
+			{
+				s_btmhHasBox[g] = 0;
+			}
+		}
+	}
+	s_btmhSegCount = 0;
+	memset(s_btmhFHas, 0, sizeof(s_btmhFHas));
 }
 
 /* A bin hit capacity mid-frame: spill it as one opaque segment (order-free,
@@ -3740,7 +4300,9 @@ internal void N3DS_ConvertTriangleVerts(N3DS_Vertex *dst3, const GrVertex *triVe
 
 			if (g_dbg_packetDepth && (src->emitOrdinal >= 0xFFC0u))
 			{
-				sx = (s16)NativeWide_UiShiftX((int)sx);
+				extern int N3DS_UiEdgeExtend(int x);
+
+				sx = (s16)N3DS_UiEdgeExtend(NativeWide_UiShiftX((int)sx));
 			}
 			dst->x = sx;
 		}
@@ -4164,7 +4726,17 @@ int NativeRenderer_InitialiseRender(char *windowName, int width, int height, int
 	if (!N3DS_C3DInit())
 	{
 		N3DS_DebugLog("[CTR-3DS] citro3d init FAILED");
+		N3DS_ShowFatalGfxScreen("citro3d init failed (out of linear memory?)");
 		return 0;
+	}
+	s_totalCells = N3DS_C3DAtlasCount() * N3DS_ATLAS_CELLS_PER_ATLAS;
+	s_subPageTotalCells = N3DS_SUBPAGE_PHYSICAL_CELLS * N3DS_SUBPAGE_CELLS_PER_PHYSICAL;
+	{
+		char msg[128];
+
+		snprintf(msg, sizeof(msg), "[CTR-3DS] decode cache: %d atlases, %d full-page cells, %d sub-page slots", N3DS_C3DAtlasCount(),
+		         N3DS_FULLPAGE_RESERVED_CELLS, s_subPageTotalCells);
+		N3DS_DebugLog(msg);
 	}
 
 	/* All-bits-set = -1 in every bucket (see the hash-index comment). */
@@ -4405,10 +4977,16 @@ void NativeRenderer_BeginScene(void)
 
 void NativeRenderer_EndScene(void)
 {
+	/* [ENDPROF] chain (n3ds_backend.h): each mark closes one phase and opens
+	 * the next, so the phases tile EndScene exactly. 0 and no-ops in a
+	 * production build. */
+	unsigned long long endProfT;
+
 	if (!s_rendererInitialised)
 	{
 		return;
 	}
+	endProfT = N3DS_EndProfNow();
 
 	/*
 	 * Draw the skybox FIRST -- before the resident track pass and before the
@@ -4427,6 +5005,7 @@ void NativeRenderer_EndScene(void)
 		N3DS_DrawBackdropPass();
 		N3DS_DrawSkyPass();
 	}
+	endProfT = N3DS_EndProfMark(N3DS_ENDPROF_SKY, endProfT);
 
 #if defined(CTR_NATIVE_TRACK_RENDERER) && CTR_NATIVE_TRACK_RENDERER
 	/*
@@ -4464,6 +5043,7 @@ void NativeRenderer_EndScene(void)
 		NativePerf_BeginScope(NATIVE_PERF_BUCKET_NATIVE_TRACK_DRAW);
 		NativeTrackDraw_IssueForWalk();
 		NativePerf_EndScope(NATIVE_PERF_BUCKET_NATIVE_TRACK_DRAW);
+		endProfT = N3DS_EndProfMark(N3DS_ENDPROF_TRACK, endProfT);
 
 		/* NativeTrackDraw_IssueForWalk's own N3DS_TrackDraw_End (called once
 		 * per leaf-draw bracket, even when zero leaves drew) already restored
@@ -4492,12 +5072,14 @@ void NativeRenderer_EndScene(void)
 	NativePerf_BeginScope(NATIVE_PERF_BUCKET_MERGE_FLUSH);
 	N3DS_MergeFlush();
 	NativePerf_EndScope(NATIVE_PERF_BUCKET_MERGE_FLUSH);
+	endProfT = N3DS_EndProfMark(N3DS_ENDPROF_MERGE, endProfT);
 
 	/* Bisect ('uilast' off): draw the UI pass HERE, in the slot UI occupied
 	 * when it still lived in the merge bins, instead of last. See g_dbg_uiLast. */
 	if (!g_dbg_uiLast)
 	{
 		N3DS_DrawUiPass();
+		endProfT = N3DS_EndProfMark(N3DS_ENDPROF_UI, endProfT);
 	}
 
 #if defined(CTR_NATIVE_MODEL_RENDERER) && CTR_NATIVE_MODEL_RENDERER
@@ -4527,6 +5109,7 @@ void NativeRenderer_EndScene(void)
 		NativePerf_EndScope(NATIVE_PERF_BUCKET_NATIVE_MODEL_DRAW);
 		s_texdecFrameMdlTicks += N3DS_GetTickCount() - texdecMdlT0;
 	}
+	endProfT = N3DS_EndProfMark(N3DS_ENDPROF_MODEL, endProfT);
 #endif
 
 #if defined(CTR_NATIVE_TRACK_RENDERER) && CTR_NATIVE_TRACK_RENDERER
@@ -4538,6 +5121,7 @@ void NativeRenderer_EndScene(void)
 		NativePerf_BeginScope(NATIVE_PERF_BUCKET_NATIVE_TRACK_DRAW);
 		NativeTrackDraw_IssueForWalk();
 		NativePerf_EndScope(NATIVE_PERF_BUCKET_NATIVE_TRACK_DRAW);
+		endProfT = N3DS_EndProfMark(N3DS_ENDPROF_TRACK, endProfT);
 	}
 #endif
 
@@ -4567,6 +5151,7 @@ void NativeRenderer_EndScene(void)
 		s_mergeDepthWriteState = -1;
 		N3DS_MergeFlush();
 	}
+	endProfT = N3DS_EndProfMark(N3DS_ENDPROF_SMOKE, endProfT);
 #endif
 
 	/*
@@ -4580,6 +5165,7 @@ void NativeRenderer_EndScene(void)
 	if (g_dbg_uiLast)
 	{
 		N3DS_DrawUiPass();
+		endProfT = N3DS_EndProfMark(N3DS_ENDPROF_UI, endProfT);
 	}
 
 #ifdef CTR_INTERNAL
@@ -4657,16 +5243,19 @@ void NativeRenderer_EndScene(void)
 	 * holding its last stereo frame while that diagnostic combo is active --
 	 * defined, visible-as-what-it-is, and gone the moment merge is back on.
 	 */
+	endProfT = N3DS_EndProfMark(N3DS_ENDPROF_OTHER, endProfT); /* the atlas inspector */
 	if (s_mergeActive)
 	{
 		N3DS_StereoRenderRightEye();
 	}
+	endProfT = N3DS_EndProfMark(N3DS_ENDPROF_RIGHT, endProfT);
 
 	/* Bottom-screen minimap, LAST of all: after the right-eye replay so its
 	 * target/state switches can never leak into the journaled eyes, before
 	 * FrameEnd so its draws join this frame's command list. Self-guarding --
 	 * drains its own state even when there is nothing to draw. */
 	N3DS_DrawBottomMapPass();
+	endProfT = N3DS_EndProfMark(N3DS_ENDPROF_BOTTOM, endProfT);
 
 	s_endSceneCount++;
 	// C3D_FrameEnd: the whole frame's queued GPU commands actually execute
@@ -4674,6 +5263,7 @@ void NativeRenderer_EndScene(void)
 	NativePerf_BeginScope(NATIVE_PERF_BUCKET_N3DS_FRAME_END);
 	N3DS_C3DEndFrame();
 	NativePerf_EndScope(NATIVE_PERF_BUCKET_N3DS_FRAME_END);
+	(void)N3DS_EndProfMark(N3DS_ENDPROF_FRAMEEND, endProfT);
 }
 
 void NativeRenderer_UpdateSwapIntervalState(int swapInterval)
@@ -4729,22 +5319,23 @@ internal void N3DS_StatsEmitRow(const char *text)
 
 internal void N3DS_StatsDripRow(void)
 {
+	/* One row per frame, only with the stats toggle (dumpreq 'stats') on, and
+	 * only when the row changed: it lands in the bottom UI's log view (and the
+	 * stream/SD log through N3DS_DebugLog's own callers) rather than a console
+	 * that no longer exists. */
+	static char s_shown[N3DS_STATS_ROWS][N3DS_STATS_COLS];
 	const int r = s_statsCursor;
 
-	/* Consolidated console-visibility gate (map owns the panel / stats console
-	 * off / boot text still up) -- see g_dbg_statsConsole. Glyphs land in the
-	 * shared framebuffer at print time, so this must be gated at the painter,
-	 * not at present. Composition and the log mirror continue regardless. */
-	if (!N3DS_ConsolePaintAllowed())
+	if (!g_dbg_statsConsole)
 	{
 		return;
 	}
-
 	s_statsCursor = (s_statsCursor + 1) % N3DS_STATS_ROWS;
-	/* Unconditional, not diffed -- repainting an unchanged row is what makes
-	 * this self-cleaning. Rows the block never filled are blank by static
-	 * init, so they scrub to spaces rather than keeping stale text. */
-	printf("\x1b[%d;1H%-40.40s", r + 1, s_statsPending[r]);
+	if (strncmp(s_shown[r], s_statsPending[r], N3DS_STATS_COLS - 1) != 0)
+	{
+		memcpy(s_shown[r], s_statsPending[r], N3DS_STATS_COLS);
+		N3DS_BottomUi_LogLine(s_statsPending[r]);
+	}
 }
 
 /*
@@ -4824,9 +5415,9 @@ void NativeRenderer_SwapWindow(void)
 			char texdecLine[224];
 			int len;
 
-			len = snprintf(texdecLine, sizeof(texdecLine), "[TEXDEC] frame=%lu sub=%lu full=%lu decUs=%lu upUs=%lu mdlUs=%lu",
+			len = snprintf(texdecLine, sizeof(texdecLine), "[TEXDEC] frame=%lu sub=%lu full=%lu part=%lu decUs=%lu upUs=%lu mdlUs=%lu",
 			               (unsigned long)s_frameCounter, (unsigned long)s_texdecFrameSub, (unsigned long)s_texdecFrameFull,
-			               decUs, upUs, mdlUs);
+			               (unsigned long)s_texdecFramePart, decUs, upUs, mdlUs);
 			if ((len > 0) && ((size_t)len < sizeof(texdecLine)) && (s_texdecFrameWorstTicks > 0))
 			{
 				const unsigned long worstUs = (unsigned long)((s_texdecFrameWorstTicks * 1000000ULL) / texdecFreq);
@@ -4846,6 +5437,7 @@ void NativeRenderer_SwapWindow(void)
 		}
 		s_texdecFrameSub = 0;
 		s_texdecFrameFull = 0;
+		s_texdecFramePart = 0;
 		s_texdecFrameDecTicks = 0;
 		s_texdecFrameUpTicks = 0;
 		s_texdecFrameMdlTicks = 0;
@@ -5015,6 +5607,7 @@ void NativeRenderer_SwapWindow(void)
 		         NativeAudio_XAStreamSectorsBuffered(), NATIVE_AUDIO_XA_RING_SECTORS, s_audio.xaStream.underrunEvents,
 		         s_audio.voicePcmArena.capacity / 1024, (int)sdata->mainGameState);
 		N3DS_DebugLog(line);
+		N3DS_MemLog("window");
 
 		/*
 		 * Texture decode cache diagnostics -- added to check whether the cache
@@ -5679,9 +6272,34 @@ void NativeRenderer_SwapWindow(void)
 		}
 	}
 
-	/* One row of the bottom screen, every frame -- see N3DS_StatsDripRow.
-	 * Sits here, just before the present that pushes the console framebuffer,
-	 * so the row is on screen the same frame it is drawn. */
+	/* Bottom-screen UI (n3ds_bottomui.c): per presented frame it records the
+	 * frame time, reaps the FTP thread and decides whether a repaint is due.
+	 * The game-side numbers it cannot see (the UI TU has no game headers) are
+	 * handed over here. Cheap: a ring write and a few compares. */
+	{
+		struct N3DS_BottomUiGameInfo gi;
+
+		memset(&gi, 0, sizeof(gi));
+		gi.drawCalls = (unsigned int)s_drawCallCount;
+		gi.mergeVerts = (unsigned int)(s_mergeVertsOpaque + s_mergeVertsBlend);
+		gi.levelID = NativePerf_CurrentLevelID();
+		gi.gameMode = (sdata->gGT != NULL) ? sdata->gGT->gameMode1 : 0;
+		gi.mainState = (int)sdata->mainGameState;
+#ifdef CTR_INTERNAL
+		gi.perfValid = (s_perfConsoleTotalUs > 0);
+		gi.perfTotalUs = s_perfConsoleTotalUs;
+		gi.perfWorkUs = s_perfConsoleWorkUs;
+		gi.perfWorstUs = s_perfConsoleWorstUs;
+		gi.bucketName[0] = s_perfConsoleName[0];
+		gi.bucketName[1] = s_perfConsoleName[1];
+		gi.bucketUs[0] = s_perfConsoleUs[0];
+		gi.bucketUs[1] = s_perfConsoleUs[1];
+#endif
+		N3DS_BottomUi_Frame(&gi);
+	}
+
+	/* The stats block no longer has a console to drip into; its rows go to the
+	 * UI's log view. */
 	N3DS_StatsDripRow();
 
 	NativePerf_BeginScope(NATIVE_PERF_BUCKET_N3DS_GFX_PRESENT);
@@ -5800,6 +6418,14 @@ void NativeRenderer_PresentVRAMRect(int displayX, int displayY, int displayW, in
 
 	if ((displayW <= 0) || (displayH <= 0))
 	{
+		return;
+	}
+
+	/* A present issued with no citro3d frame open (renderer not up yet, or the
+	 * frame already ended) would panic the GPU command buffer: skip it loudly. */
+	if (!N3DS_C3DFrameOpen())
+	{
+		N3DS_C3DNoteDrawOutsideFrame("PresentVRAMRect");
 		return;
 	}
 
@@ -6518,6 +7144,10 @@ void NativeRenderer_DrawTriangles(int startVertex, int triangles)
 				{
 					uiDst = N3DS_BtmFpsAppend(s_currentBlendMode, untextured ? 0 : 1, atlasIdx);
 				}
+				else if (g_dbg_btmMap && PKTDEPTH_UI_STAMP_IS_BTMHUD(triVerts[0].emitOrdinal))
+				{
+					uiDst = N3DS_BtmHudAppend((int)(triVerts[0].emitOrdinal - PKTDEPTH_UI_STAMP_BTMHUD_BASE), s_currentBlendMode, untextured ? 0 : 1, atlasIdx);
+				}
 				else
 				{
 					uiDst = N3DS_UiOrderAppend(s_currentBlendMode, untextured ? 0 : 1, atlasIdx);
@@ -6567,6 +7197,27 @@ void NativeRenderer_DrawTriangles(int startVertex, int triangles)
 				 * (RouteActive's legality rests on routed prims staying off
 				 * the top screen there). Independent of the bottom append's
 				 * success: a full bottom list must not hole the top map. */
+				/* Race HUD: the routed copy above feeds the bottom panel; unless AUTO-HIDE is on with
+				 * the MAPA tab up (N3DS_BottomUi_HudBelow), the top screen keeps its own HUD too. */
+				if (g_dbg_btmMap && PKTDEPTH_UI_STAMP_IS_BTMHUD(triVerts[0].emitOrdinal) && (triVerts[0].emitOrdinal != (PKTDEPTH_UI_STAMP_BTMHUD_BASE + N3DS_BTMH_G_LISTX)) &&
+				    (triVerts[0].emitOrdinal != (PKTDEPTH_UI_STAMP_BTMHUD_BASE + N3DS_BTMH_G_LISTBAR)) &&
+				    !N3DS_BottomUi_HudBelowWanted())
+				{
+					N3DS_Vertex *topDst = N3DS_UiOrderAppend(s_currentBlendMode, untextured ? 0 : 1, atlasIdx);
+
+					if (topDst != NULL)
+					{
+						const s16 pinned = (s16)(0xFFFFu - 32768);
+
+						N3DS_ConvertTriangleVerts(topDst, triVerts, untextured, cellX, cellY, pixelBaseU, pixelBaseV, originU, originV);
+						topDst[0].z = pinned;
+						topDst[1].z = pinned;
+						topDst[2].z = pinned;
+						topDst[0].w = pinned;
+						topDst[1].w = pinned;
+						topDst[2].w = pinned;
+					}
+				}
 				if (g_dbg_btmMap && g_dbg_mapBoth && (triVerts[0].emitOrdinal == PKTDEPTH_UI_STAMP_BTMMAP) &&
 				    ((g_dbg_mapBoth >= 2) || NativeGpu_UiMapRetailTop()))
 				{
@@ -6781,7 +7432,7 @@ void NativeRenderer3DS_DebugDumpCacheMeta(void)
 	N3DS_MetaWriteU32(f, (u32)N3DS_FULLPAGE_RESERVED_CELLS);
 	N3DS_MetaWriteU32(f, (u32)N3DS_SUBPAGE_TOTAL_CELLS);
 	N3DS_MetaWriteU32(f, (u32)N3DS_SUBPAGE_PHYSICAL_BASE);
-	N3DS_MetaWriteU32(f, (u32)N3DS_ATLAS_COUNT);
+	N3DS_MetaWriteU32(f, (u32)N3DS_C3DAtlasCount());
 	N3DS_MetaWriteU32(f, (u32)N3DS_ATLAS_DIM);
 	N3DS_MetaWriteU32(f, (u32)N3DS_DECODE_TEXTURE_DIM);
 	N3DS_MetaWriteU32(f, (u32)N3DS_SUBPAGE_DIM);

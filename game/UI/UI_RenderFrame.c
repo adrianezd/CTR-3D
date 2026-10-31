@@ -11,6 +11,28 @@ extern void NativeGpu_MarkUiMapRange(uintptr_t start, uintptr_t end, int retailT
 // The juiced-wumpa shine (UI_Weapon_DrawBG) draws into the player's OT, not the
 // UI OT, so nothing downstream classifies it as UI without this span mark.
 extern void NativeGpu_MarkHudShineRange(uintptr_t start, uintptr_t end);
+// One piece of the 1P race HUD for the bottom-screen HUD (groups below). The draw calls
+// allocate sequentially from primMem, so [cursor-before, cursor-after) is exactly the piece.
+extern void NativeGpu_MarkUiHudRange(uintptr_t start, uintptr_t end, int group);
+#define HUD_GROUP_RANK 1
+#define HUD_GROUP_LAP 2
+#define HUD_GROUP_CLOCK 3
+#define HUD_GROUP_WUMPA 4
+#define HUD_GROUP_SPEED 5
+#define HUD_GROUP_WEAPON 6
+#define HUD_GROUP_LIST 7
+#define HUD_GROUP(group, ...)                                                                               \
+	do                                                                                                      \
+	{                                                                                                       \
+		uintptr_t hudPrimStart_ = (uintptr_t)gGT->backBuffer->primMem.cursor;                               \
+		__VA_ARGS__;                                                                                        \
+		if (numPlyr == 1)                                                                                   \
+		{                                                                                                   \
+			NativeGpu_MarkUiHudRange(hudPrimStart_, (uintptr_t)gGT->backBuffer->primMem.cursor, (group));   \
+		}                                                                                                   \
+	} while (0)
+#else
+#define HUD_GROUP(group, ...) __VA_ARGS__
 #endif
 #ifdef CTR_NATIVE
 // Bottom-screen map hook (platform/native_gpu.c). RouteActive lets the map
@@ -140,7 +162,7 @@ void UI_RenderFrame_Racing()
 	// and not in time trial
 	if ((gameMode1 & (RELIC_RACE | TIME_TRIAL | BATTLE_MODE)) == 0)
 	{
-		UI_DrawRankedDrivers();
+		HUD_GROUP(HUD_GROUP_LIST, UI_DrawRankedDrivers());
 	}
 
 	// pointer to first Player thread
@@ -205,10 +227,10 @@ void UI_RenderFrame_Racing()
 			    // if want to draw speedometer
 			    ((sdata->HudAndDebugFlags & 8) != 0))
 			{
-				UI_DrawSpeedNeedle(hudStructPtr[UI_HUD_SLOT_SPEEDOMETER].x + offset, hudStructPtr[UI_HUD_SLOT_SPEEDOMETER].y, playerStruct);
-				UI_JumpMeter_Draw(hudStructPtr[UI_HUD_SLOT_JUMP_METER].x, hudStructPtr[UI_HUD_SLOT_JUMP_METER].y, playerStruct);
-				UI_DrawSlideMeter(hudStructPtr[UI_HUD_SLOT_SLIDE_METER].x + offset, hudStructPtr[UI_HUD_SLOT_SLIDE_METER].y, playerStruct);
-				UI_DrawSpeedBG();
+				HUD_GROUP(HUD_GROUP_SPEED, UI_DrawSpeedNeedle(hudStructPtr[UI_HUD_SLOT_SPEEDOMETER].x + offset, hudStructPtr[UI_HUD_SLOT_SPEEDOMETER].y, playerStruct));
+				HUD_GROUP(HUD_GROUP_SPEED, UI_JumpMeter_Draw(hudStructPtr[UI_HUD_SLOT_JUMP_METER].x, hudStructPtr[UI_HUD_SLOT_JUMP_METER].y, playerStruct));
+				HUD_GROUP(HUD_GROUP_SPEED, UI_DrawSlideMeter(hudStructPtr[UI_HUD_SLOT_SLIDE_METER].x + offset, hudStructPtr[UI_HUD_SLOT_SLIDE_METER].y, playerStruct));
+				HUD_GROUP(HUD_GROUP_SPEED, UI_DrawSpeedBG());
 			}
 
 			if ((playerStruct->actionsFlagSet & ACTION_RACE_FINISHED) == 0)
@@ -217,12 +239,12 @@ void UI_RenderFrame_Racing()
 				if ((gameMode1 & BATTLE_MODE) == 0)
 				{
 					// Draw powerslide meter
-					UI_DrawSlideMeter(hudStructPtr[UI_HUD_SLOT_SLIDE_METER].x + offset, hudStructPtr[UI_HUD_SLOT_SLIDE_METER].y, playerStruct);
+					HUD_GROUP(HUD_GROUP_SPEED, UI_DrawSlideMeter(hudStructPtr[UI_HUD_SLOT_SLIDE_METER].x + offset, hudStructPtr[UI_HUD_SLOT_SLIDE_METER].y, playerStruct));
 
 #if defined(CTR_NATIVE)
 					if (g_reservesMeter)
 					{
-						UI_DrawReservesMeter(hudStructPtr[UI_HUD_SLOT_SLIDE_METER].x + offset, hudStructPtr[UI_HUD_SLOT_SLIDE_METER].y, playerStruct);
+						HUD_GROUP(HUD_GROUP_SPEED, UI_DrawReservesMeter(hudStructPtr[UI_HUD_SLOT_SLIDE_METER].x + offset, hudStructPtr[UI_HUD_SLOT_SLIDE_METER].y, playerStruct));
 					}
 #endif
 				}
@@ -230,7 +252,7 @@ void UI_RenderFrame_Racing()
 				// If you are not in Time Trial or Relic Race
 				if ((gameMode1 & (TIME_TRIAL | RELIC_RACE)) == 0)
 				{
-					UI_DrawNumWumpa(hudStructPtr[UI_HUD_SLOT_WUMPA_COUNT].x, hudStructPtr[UI_HUD_SLOT_WUMPA_COUNT].y, playerStruct);
+					HUD_GROUP(HUD_GROUP_WUMPA, UI_DrawNumWumpa(hudStructPtr[UI_HUD_SLOT_WUMPA_COUNT].x, hudStructPtr[UI_HUD_SLOT_WUMPA_COUNT].y, playerStruct));
 				}
 			}
 
@@ -268,7 +290,8 @@ void UI_RenderFrame_Racing()
 						OtherFX_Play(0x42, 1);
 
 						// initial timer value
-						partTimeVariable1 = 5;
+						// 60fps: doubled like the 231 writers (ModSDK UI_44_RenderFrame_Racing)
+						partTimeVariable1 = FPS_DOUBLE(5);
 
 						// if timer is already running, set new timer value
 						if (playerStruct->PickupWumpaHUD.numCollected != 0)
@@ -280,7 +303,7 @@ void UI_RenderFrame_Racing()
 					{
 						UI_Lerp2D_HUD(wumpaModelPos.v, (int)playerStruct->PickupWumpaHUD.startX, (int)playerStruct->PickupWumpaHUD.startY,
 						              hudStructPtr[UI_HUD_SLOT_FRUIT_MODEL].x, hudStructPtr[UI_HUD_SLOT_FRUIT_MODEL].y, playerStruct->PickupWumpaHUD.cooldown,
-						              5);
+						              FPS_DOUBLE(5)); // 60fps: cooldown written doubled (ModSDK UI_44)
 
 						// subtract one from timer
 						partTimeVariable1 = playerStruct->PickupWumpaHUD.cooldown - 1;
@@ -342,7 +365,7 @@ void UI_RenderFrame_Racing()
 
 					// Interpolate from start pos to end pos
 					UI_Lerp2D_HUD(letterCtrPos.v, playerStruct->PickupLetterHUD.startX, playerStruct->PickupLetterHUD.startY, (int)letterCtrPos.x,
-					              (int)letterCtrPos.y, (int)playerStruct->PickupLetterHUD.cooldown, 10);
+					              (int)letterCtrPos.y, (int)playerStruct->PickupLetterHUD.cooldown, FPS_DOUBLE(10)); // 60fps: RB_CtrLetter doubles it (ModSDK UI_44)
 
 					curr->matrix.t[0] = UI_ConvertX_2((int)letterCtrPos.x, 0x200);
 					curr->matrix.t[1] = UI_ConvertY_2((int)letterCtrPos.y, 0x200);
@@ -356,8 +379,7 @@ void UI_RenderFrame_Racing()
 				if ((playerStruct->actionsFlagSet & ACTION_RACE_FINISHED) == 0)
 				{
 					// Draw weapon and number of wumpa fruit in HUD
-					UI_Weapon_DrawSelf(hudStructPtr[UI_HUD_SLOT_WEAPON].x, hudStructPtr[UI_HUD_SLOT_WEAPON].y, hudStructPtr[UI_HUD_SLOT_WEAPON].scale,
-					                   playerStruct);
+					HUD_GROUP(HUD_GROUP_WEAPON, UI_Weapon_DrawSelf(hudStructPtr[UI_HUD_SLOT_WEAPON].x, hudStructPtr[UI_HUD_SLOT_WEAPON].y, hudStructPtr[UI_HUD_SLOT_WEAPON].scale, playerStruct));
 				}
 			}
 
@@ -376,7 +398,7 @@ void UI_RenderFrame_Racing()
 
 					// 4b4 and 4b6 are WindowStartPos(x,y) from PushBuffer, inside Driver
 					UI_Lerp2D_HUD(wumpaModelPos.v, playerStruct->PickupTimeboxHUD.startX, playerStruct->PickupTimeboxHUD.startY, 0x14, 8,
-					              playerStruct->PickupTimeboxHUD.cooldown, 10);
+					              playerStruct->PickupTimeboxHUD.cooldown, FPS_DOUBLE(10)); // 60fps: RB_Crate doubles it (ModSDK UI_44)
 
 					// Decrease remaining number of frames for this to be on screen
 					playerStruct->PickupTimeboxHUD.cooldown--;
@@ -439,7 +461,13 @@ void UI_RenderFrame_Racing()
 					              playerStruct->BattleHUD.cooldown, 5);
 
 					// subtract one from the number of frames that the animation lasts
-					playerStruct->BattleHUD.cooldown--;
+					// 60fps: VehPickState writes 5 retail frames (not doubled, and
+					// compares it with 5): count every other frame instead of
+					// ModSDK UI_44's FPS_DOUBLE(5) lerp end
+					if (FPS60_HALF_RATE(gGT->timer))
+					{
+						playerStruct->BattleHUD.cooldown--;
+					}
 
 					// print the string that shows the change in your score
 					DecalFont_DrawLine((char *)&string[0], (int)wumpaModelPos.x, (int)wumpaModelPos.y, FONT_SMALL, RED);
@@ -450,8 +478,7 @@ void UI_RenderFrame_Racing()
 			{
 				if ((playerStruct->actionsFlagSet & ACTION_RACE_FINISHED) == 0)
 				{
-					UI_DrawLapCount(hudStructPtr[UI_HUD_SLOT_LAP_COUNT].x, hudStructPtr[UI_HUD_SLOT_LAP_COUNT].y,
-					                (u32)hudStructPtr[UI_HUD_SLOT_LAP_COUNT].scale, playerStruct);
+					HUD_GROUP(HUD_GROUP_LAP, UI_DrawLapCount(hudStructPtr[UI_HUD_SLOT_LAP_COUNT].x, hudStructPtr[UI_HUD_SLOT_LAP_COUNT].y, (u32)hudStructPtr[UI_HUD_SLOT_LAP_COUNT].scale, playerStruct));
 				}
 			}
 			else
@@ -490,14 +517,15 @@ void UI_RenderFrame_Racing()
 						goto LAB_80053af4;
 					}
 
-					bVar3 = (gGT->timer & 1) == 0;
+					// 60fps: blink at the retail rate (30 Hz frames)
+					bVar3 = (Fps60_Timer30() & 1) == 0;
 					sVar17 = (u16)bVar3 << 2;
 					partTimeVariable5 = ((u32)bVar3 << 0x12) >> 0x10;
 				}
 
 				sVar1 = hudStructPtr[UI_HUD_SLOT_RANK].x;
 				sVar2 = hudStructPtr[UI_HUD_SLOT_RANK].y;
-				UI_DrawPosSuffix(sVar1, sVar2, playerStruct, (s16)partTimeVariable5);
+				HUD_GROUP(HUD_GROUP_RANK, UI_DrawPosSuffix(sVar1, sVar2, playerStruct, (s16)partTimeVariable5));
 
 				if (numPlyr > 2)
 				{
@@ -528,10 +556,11 @@ void UI_RenderFrame_Racing()
 			// If you're in end-of-race and Battle
 			else if ((partTimeVariable5 & 0x200020) == 0x200020)
 			{
-				partTimeVariable5 = (u32)((gGT->timer & 1) == 0) << 2;
+				// 60fps: blink at the retail rate (30 Hz frames)
+				partTimeVariable5 = (u32)((Fps60_Timer30() & 1) == 0) << 2;
 
 				// Draw the "st", "nd", "rd" suffix after "1st, 2nd, 3rd, etc"
-				UI_DrawPosSuffix(hudStructPtr[UI_HUD_SLOT_RANK].x, hudStructPtr[UI_HUD_SLOT_RANK].y, playerStruct, (s16)partTimeVariable5);
+				HUD_GROUP(HUD_GROUP_RANK, UI_DrawPosSuffix(hudStructPtr[UI_HUD_SLOT_RANK].x, hudStructPtr[UI_HUD_SLOT_RANK].y, playerStruct, (s16)partTimeVariable5));
 
 				// Get Color Data
 				ptrColor = data.ptrColor[partTimeVariable5];
@@ -597,13 +626,17 @@ void UI_RenderFrame_Racing()
 		sdata->WrongWayDirection_bool = cVar22;
 	}
 
-	sdata->framesDrivingSameDirection++;
+	// 60fps: retail frames (HOWL_Voiceline compares it with 0x1e)
+	if (FPS60_HALF_RATE(gGT->timer))
+	{
+		sdata->framesDrivingSameDirection++;
+	}
 
 	if (numPlyr == 1)
 	{
 		playerStruct = gGT->drivers[0];
 
-		UI_DrawRaceClock(0x14, 8, UI_RACE_CLOCK_SHOW_CURRENT_TIME, playerStruct);
+		HUD_GROUP(HUD_GROUP_CLOCK, UI_DrawRaceClock(0x14, 8, UI_RACE_CLOCK_SHOW_CURRENT_TIME, playerStruct));
 
 		turboThread = 0;
 		turboThreadObject = 0;
@@ -1070,7 +1103,8 @@ void UI_RenderFrame_CrystChall(void)
 
 		if (player->PickupWumpaHUD.numCollected != 0)
 		{
-			player->PickupWumpaHUD.cooldown = 5;
+			// 60fps: doubled like RB_Crystal's write (ModSDK UI_46_RenderFrame_CrystChall)
+			player->PickupWumpaHUD.cooldown = FPS_DOUBLE(5);
 		}
 	}
 
@@ -1079,7 +1113,7 @@ void UI_RenderFrame_CrystChall(void)
 	{
 		// interpolate position over course of 5 frames
 		UI_Lerp2D_HUD(crystalPos.v, (int)player->PickupWumpaHUD.startX, (int)player->PickupWumpaHUD.startY, (int)hudStructPtr[UI_HUD_SLOT_CRYSTAL].x,
-		              (int)hudStructPtr[UI_HUD_SLOT_CRYSTAL].y, player->PickupWumpaHUD.cooldown, 5);
+		              (int)hudStructPtr[UI_HUD_SLOT_CRYSTAL].y, player->PickupWumpaHUD.cooldown, FPS_DOUBLE(5)); // 60fps: ModSDK UI_46
 
 		// reduce cooldown between getting each wumpa (or crystal)
 		player->PickupWumpaHUD.cooldown--;

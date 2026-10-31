@@ -31,6 +31,20 @@ enum UIRankConstants
 	UI_RANK_TRACK_CHECKPOINT_COUNT_LIMIT = 0xff,
 };
 
+#if defined(CTR_NATIVE) && CTR_NATIVE_GTE_CAPTURE
+/* 3DS bottom-screen race HUD: the full ranking, not retail's first four. Rows 5..8 (digits, icons)
+ * and the highlight of the player's own row are drawn as HUD group 8, which the renderer keeps off
+ * the top screen (the retail list there is untouched). See NativeUiHud_ExtrasWanted. */
+extern int NativeUiHud_ExtrasWanted(void);
+extern int g_uiDriverIconNoClip;
+extern void NativeGpu_MarkUiHudRange(uintptr_t start, uintptr_t end, int group);
+#define UI_RANK_HUD_GROUP_EXTRA 8
+#define UI_RANK_HUD_GROUP_TOPONLY 10 /* retail's small digits: kept for the top screen, never drawn on the bottom one */
+#define UI_RANK_HUD_GROUP_BAR 9 /* the player's highlight: the renderer draws it first, behind the icons */
+#define UI_RANK_EXTRA_BOX_X 0x0e
+#define UI_RANK_EXTRA_BOX_W 0x48
+#endif
+
 CTR_STATIC_ASSERT(UI_RANK_DRIVER_COUNT == 8);
 CTR_STATIC_ASSERT(UI_RANK_VISIBLE_ARCADE_COUNT == 4);
 CTR_STATIC_ASSERT(UI_RANK_VISIBLE_BOSS_COUNT == 2);
@@ -86,7 +100,12 @@ internal int UI_Rank_GetDamageColor(int driverIndex)
 		color += strength * 0x10000;
 
 		// one frame closer to zero
-		d->damageColorTimer += 1;
+		// 60fps: every other frame, the colour formula reads retail frames
+		// (ModSDK UI_43_DrawRankedDrivers)
+		if (FPS60_HALF_RATE(gGT->timer))
+		{
+			d->damageColorTimer += 1;
+		}
 	}
 
 	// 30 to 1
@@ -99,7 +118,11 @@ internal int UI_Rank_GetDamageColor(int driverIndex)
 		color += strength * 0x10000;
 
 		// one frame closer to zero
-		d->damageColorTimer -= 1;
+		// 60fps: every other frame (ModSDK UI_43_DrawRankedDrivers)
+		if (FPS60_HALF_RATE(gGT->timer))
+		{
+			d->damageColorTimer -= 1;
+		}
 	}
 
 	return color;
@@ -159,6 +182,54 @@ void UI_DrawRankedDrivers(void)
 			visibleRankCount = UI_RANK_VISIBLE_BOSS_COUNT;
 		}
 
+#if defined(CTR_NATIVE) && CTR_NATIVE_GTE_CAPTURE
+		int extraRows = 0;
+
+		if (!IS_BOSS_RACE(gGT->gameMode1) && NativeUiHud_ExtrasWanted())
+		{
+			int rows = 0;
+			int playerRank = (gGT->drivers[0] != 0) ? (int)gGT->drivers[0]->driverRank : -1;
+
+			for (driverIndex = 0; driverIndex < UI_RANK_DRIVER_COUNT; driverIndex++)
+			{
+				if (gGT->drivers[driverIndex] != 0)
+				{
+					rows++;
+				}
+			}
+			extraRows = rows;
+
+			// The player's row, marked behind everything else: a gold translucent bar.
+			if ((playerRank >= 0) && (playerRank < rows))
+			{
+				const uintptr_t start = (uintptr_t)gGT->backBuffer->primMem.cursor;
+				RECT bar;
+				Color gold = {.r = 0xff, .g = 0xb0, .b = 0x20};
+				Color edge = {.r = 0xff, .g = 0xe0, .b = 0x60};
+
+				bar.x = UI_RANK_EXTRA_BOX_X;
+				bar.y = playerRank * UI_RANK_TEXT_SLOT_HEIGHT + UI_RANK_TEXT_START_Y - 2;
+				bar.w = UI_RANK_EXTRA_BOX_W;
+				bar.h = UI_RANK_TEXT_SLOT_HEIGHT - 2;
+				CTR_Box_DrawClearBox(&bar, &gold, TRANS_50_DECAL, gGT->pushBuffer_UI.ptrOT);
+				bar.w = 3; // solid accent on the left edge
+				CTR_Box_DrawSolidBox(&bar, edge, gGT->pushBuffer_UI.ptrOT);
+				NativeGpu_MarkUiHudRange(start, (uintptr_t)gGT->backBuffer->primMem.cursor, UI_RANK_HUD_GROUP_BAR);
+			}
+
+			// All the digits, in the big font: retail's small ones (rows 1..4, skipped below) vanish at the bottom screen's scale.
+			for (int row = 0; row < rows; row++)
+			{
+				const uintptr_t start = (uintptr_t)gGT->backBuffer->primMem.cursor;
+				s16 color = (row == playerRank) ? PAPU_YELLOW : ((row < numRacersFinished) ? RED : WHITE);
+
+				sdata->s_spacebar[0] = (char)row + '1';
+				DecalFont_DrawLine(&sdata->s_spacebar[0], UI_RANK_TEXT_X - 2, UI_RANK_TEXT_START_Y + (row * UI_RANK_TEXT_SLOT_HEIGHT) - 2, FONT_BIG, color);
+				NativeGpu_MarkUiHudRange(start, (uintptr_t)gGT->backBuffer->primMem.cursor, UI_RANK_HUD_GROUP_EXTRA);
+			}
+		}
+#endif
+
 		// height to draw rank (this bitshifts later)
 		int rankTextY = UI_RANK_TEXT_START_Y << 16;
 
@@ -175,8 +246,20 @@ void UI_DrawRankedDrivers(void)
 			}
 
 			// draw rank number: '1', '2', '3', '4'
-			sdata->s_spacebar[0] = (char)rankLineIndex + '1';
-			DecalFont_DrawLine(&sdata->s_spacebar[0], UI_RANK_TEXT_X, rankTextY >> 0x10, FONT_SMALL, txtColor);
+#if defined(CTR_NATIVE) && CTR_NATIVE_GTE_CAPTURE
+			// the bottom-screen HUD draws its own, bigger digits
+			const uintptr_t digitStart = (uintptr_t)gGT->backBuffer->primMem.cursor;
+#endif
+			{
+				sdata->s_spacebar[0] = (char)rankLineIndex + '1';
+				DecalFont_DrawLine(&sdata->s_spacebar[0], UI_RANK_TEXT_X, rankTextY >> 0x10, FONT_SMALL, txtColor);
+			}
+#if defined(CTR_NATIVE) && CTR_NATIVE_GTE_CAPTURE
+			if (extraRows != 0)
+			{
+				NativeGpu_MarkUiHudRange(digitStart, (uintptr_t)gGT->backBuffer->primMem.cursor, UI_RANK_HUD_GROUP_TOPONLY);
+			}
+#endif
 
 			// add to Y, which mekes it lower on screen
 			rankTextY = rankTextY + (UI_RANK_TEXT_SLOT_HEIGHT << 16);
@@ -219,6 +302,20 @@ void UI_DrawRankedDrivers(void)
 						}
 						else
 						{
+#if defined(CTR_NATIVE) && CTR_NATIVE_GTE_CAPTURE
+							// Bottom-screen HUD: rows 5..8 get their icon too (group 8, never on the top screen).
+							if ((desiredRank < extraRows) && (desiredRank < UI_RANK_DRIVER_COUNT))
+							{
+								const uintptr_t start = (uintptr_t)gGT->backBuffer->primMem.cursor;
+
+								g_uiDriverIconNoClip = 1;
+								UI_DrawDriverIcon(gGT->ptrIcons[data.MetaDataCharacters[data.characterIDs[driverIndex]].iconID], UI_RANK_ICON_X,
+								                  desiredRank * UI_RANK_TEXT_SLOT_HEIGHT + UI_RANK_ICON_BASE_Y, &gGT->backBuffer->primMem,
+								                  gGT->pushBuffer_UI.ptrOT, 1, UI_RANK_ICON_SCALE, damageColor);
+								g_uiDriverIconNoClip = 0;
+								NativeGpu_MarkUiHudRange(start, (uintptr_t)gGT->backBuffer->primMem.cursor, UI_RANK_HUD_GROUP_EXTRA);
+							}
+#endif
 							continue;
 						}
 					}
@@ -232,7 +329,15 @@ void UI_DrawRankedDrivers(void)
 				// === Icon Transitioning ===
 				if (isTransitioning)
 				{
-					UI_Lerp2D_Angular(&iconPos, *curr, *des, *transitionTimer);
+					// 60fps: the timer counts retail frames at half rate (below),
+					// UI_Lerp2D_Angular reads half frames (ModSDK UI_43 / UI_20
+					// count to FPS_DOUBLE(5) instead)
+					s16 lerpFrame = *transitionTimer;
+					if (FPS60)
+					{
+						lerpFrame = (s16)((*transitionTimer * 2) + (gGT->timer & 1));
+					}
+					UI_Lerp2D_Angular(&iconPos, *curr, *des, lerpFrame);
 					pos.x = iconPos.x;
 					pos.y = iconPos.y;
 				}
@@ -247,9 +352,27 @@ void UI_DrawRankedDrivers(void)
 
 				    1, iconScale, damageColor);
 
+#if defined(CTR_NATIVE) && CTR_NATIVE_GTE_CAPTURE
+				// Swaps that reach rows 5..8: retail clips the icon at y 166 (invisible below), so the bottom
+				// screen gets its own unclipped copy of the moving icon (group 8, never on the top screen).
+				if ((extraRows != 0) && isTransitioning && ((*curr >= UI_RANK_VISIBLE_ARCADE_COUNT) || (*des >= UI_RANK_VISIBLE_ARCADE_COUNT)))
+				{
+					const uintptr_t start = (uintptr_t)gGT->backBuffer->primMem.cursor;
+
+					g_uiDriverIconNoClip = 1;
+					UI_DrawDriverIcon(gGT->ptrIcons[data.MetaDataCharacters[data.characterIDs[driverIndex]].iconID], pos.x, pos.y, &gGT->backBuffer->primMem,
+					                  gGT->pushBuffer_UI.ptrOT, 1, iconScale, damageColor);
+					g_uiDriverIconNoClip = 0;
+					NativeGpu_MarkUiHudRange(start, (uintptr_t)gGT->backBuffer->primMem.cursor, UI_RANK_HUD_GROUP_EXTRA);
+				}
+#endif
+
 				if (isTransitioning)
 				{
-					transitionTimer[0]++;
+					if (FPS60_HALF_RATE(gGT->timer))
+					{
+						transitionTimer[0]++;
+					}
 
 					if (*transitionTimer >= UI_RANK_TRANSITION_FRAMES)
 					{
