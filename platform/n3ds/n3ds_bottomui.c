@@ -40,6 +40,7 @@
 #include "n3ds_backend.h"
 #include "n3ds_bottomui.h"
 #include "n3ds_debuglink.h"
+#include "n3ds_dspfirm.h"
 #include "n3ds_ftp.h"
 #include "update_manifest.h"
 #include "updater.h"
@@ -809,6 +810,71 @@ static void ui_draw_status_modal(void)
 	ui_text_c(UI_W / 2, y + 34, 1, COL_WARN, s_status);
 }
 
+/* The DSP firmware question (n3ds_dspfirm.c): a modal box over whichever tab is up. */
+#define DSPQ_W 288
+#define DSPQ_H 112
+#define DSPQ_BTN_W 118
+#define DSPQ_BTN_H 26
+
+static void ui_dspq_rect(int i, int *x, int *y, int *w, int *h)
+{
+	const int bx = (UI_W - DSPQ_W) / 2, by = (UI_H - DSPQ_H) / 2;
+
+	*y = by + DSPQ_H - DSPQ_BTN_H - 8;
+	*w = DSPQ_BTN_W;
+	*h = DSPQ_BTN_H;
+	*x = (i == 0) ? (bx + 14) : (bx + DSPQ_W - 14 - DSPQ_BTN_W);
+	if (N3DS_DspFirm_State() != N3DS_DSPFIRM_ASK)
+	{
+		*x = (UI_W - DSPQ_BTN_W) / 2; /* one OK button */
+	}
+}
+
+static void ui_draw_dspq(void)
+{
+	const int state = N3DS_DspFirm_State();
+	const int bx = (UI_W - DSPQ_W) / 2, by = (UI_H - DSPQ_H) / 2;
+	int x, y, w, h;
+
+	if (state == N3DS_DSPFIRM_NONE)
+	{
+		return;
+	}
+	ui_cell(bx - 2, by - 2, DSPQ_W + 4, DSPQ_H + 4, ui_shade(COL_BG, 4), COL_EDGE); /* the dimmed halo */
+	ui_cell(bx, by, DSPQ_W, DSPQ_H, COL_PANEL, COL_ACCENT);
+	ui_text_c(UI_W / 2, by + 10, 1, COL_LABEL, TR("SOUND NEEDS THE DSP FIRMWARE", "EL SONIDO NECESITA EL FIRMWARE DSP"));
+	ui_rect(bx + 10, by + 22, DSPQ_W - 20, 1, COL_SEP);
+	if (state == N3DS_DSPFIRM_ASK)
+	{
+		ui_text_c(UI_W / 2, by + 32, 1, COL_WARN, N3DS_DspFirm_Missing() ? TR("THE FILE IS MISSING", "EL ARCHIVO NO ESTA") : TR("THE FILE IS DAMAGED", "EL ARCHIVO ESTA DANADO"));
+		ui_text_c(UI_W / 2, by + 48, 1, COL_LABEL, TR("EXTRACT IT FROM THIS CONSOLE?", "EXTRAERLO DE ESTA CONSOLA?"));
+		ui_dspq_rect(0, &x, &y, &w, &h);
+		ui_button(x, y, w, h, COL_BTN_ACT, 0);
+		ui_text_c(x + (w / 2), y + 9, 1, COL_TEXT, TR("EXTRACT", "EXTRAER"));
+		ui_dspq_rect(1, &x, &y, &w, &h);
+		ui_button(x, y, w, h, COL_BTN_OFF, 0);
+		ui_text_c(x + (w / 2), y + 9, 1, COL_TEXT, TR("NO SOUND", "SIN SONIDO"));
+	}
+	else if (state == N3DS_DSPFIRM_WORKING)
+	{
+		ui_text_c(UI_W / 2, by + 52, 1, COL_WARN, TR("EXTRACTING...", "EXTRAYENDO..."));
+	}
+	else
+	{
+		const int ok = (state == N3DS_DSPFIRM_DONE);
+
+		ui_text_c(UI_W / 2, by + 36, 1, ok ? COL_GOOD : COL_BAD, ok ? TR("DONE: THE SOUND IS ON", "LISTO: EL SONIDO FUNCIONA") : TR("COULD NOT EXTRACT IT", "NO SE PUDO EXTRAER"));
+		if (!ok)
+		{
+			ui_text_c(UI_W / 2, by + 52, 1, TH->faint, N3DS_DspFirm_Failure());
+			ui_text_c(UI_W / 2, by + 66, 1, TH->faint, TR("DUMP IT WITH ROSALINA INSTEAD", "VUELCALO CON ROSALINA"));
+		}
+		ui_dspq_rect(0, &x, &y, &w, &h);
+		ui_button(x, y, w, h, COL_BTN_ACT, 0);
+		ui_text_c(x + (w / 2), y + 9, 1, COL_TEXT, "OK");
+	}
+}
+
 static void ui_draw_map(void)
 {
 	ui_rect(0, CONTENT_Y, UI_W, UI_H - CONTENT_Y, COL_MAPBG);
@@ -1371,6 +1437,7 @@ static void ui_draw_all(void)
 	}
 	ui_draw_banner();
 	ui_draw_status_modal();
+	ui_draw_dspq();
 }
 
 /* ------------------------------------------------- picture -> texture/panel --- */
@@ -1637,6 +1704,7 @@ void N3DS_BottomUi_Touch(void)
 	const int injected = 0;
 #endif
 
+	N3DS_DspFirm_Pump();
 	if (!injected && !(hidKeysDown() & KEY_TOUCH))
 	{
 		return;
@@ -1651,6 +1719,29 @@ void N3DS_BottomUi_Touch(void)
 	else
 	{
 		hidTouchRead(&t);
+	}
+
+	/* The DSP firmware question is modal over everything. */
+	if (N3DS_DspFirm_State() != N3DS_DSPFIRM_NONE)
+	{
+		if (N3DS_DspFirm_State() != N3DS_DSPFIRM_WORKING)
+		{
+			const int ask = (N3DS_DspFirm_State() == N3DS_DSPFIRM_ASK);
+
+			for (i = 0; i < (ask ? 2 : 1); i++)
+			{
+				int x, y, w, h;
+
+				ui_dspq_rect(i, &x, &y, &w, &h);
+				if (ui_in(t.px, t.py, x, y, w, h))
+				{
+					N3DS_DspFirm_Answer(i == 0);
+					s_dirty = 1;
+					break;
+				}
+			}
+		}
+		return;
 	}
 
 	if (t.py < TAB_H)
@@ -1895,6 +1986,16 @@ void N3DS_BottomUi_Frame(const struct N3DS_BottomUiGameInfo *gi)
 	if (gi != NULL)
 	{
 		s_gi = *gi;
+	}
+	{
+		static int s_lastDspq;
+		const int dspq = N3DS_DspFirm_State();
+
+		if (dspq != s_lastDspq)
+		{
+			s_lastDspq = dspq;
+			s_dirty = 1;
+		}
 	}
 	N3DS_FtpPoll();
 	ui_updater_poll();
