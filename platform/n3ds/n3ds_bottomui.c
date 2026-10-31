@@ -118,14 +118,13 @@ static unsigned s_ftpSig = 0;
  * the game thread when a check finishes (Update_FormatNotes keeps a 12 KB buffer
  * on the stack, too much for the render worker that paints), then only drawn. */
 #define NOTE_LINES 384
-#define NOTE_ROWS 4
 static unsigned s_updRev = 0;
 static int s_updState = -1;
 static int s_updNew = 0; /* a newer build was found: the tab says so */
 static char s_noteRaw[12289];
 static char s_noteLines[NOTE_LINES][43];
 static unsigned s_noteCount = 0;
-static unsigned s_noteScroll = 0;
+static unsigned s_noteMScroll = 0;
 static unsigned s_frameCount = 0;
 static char s_status[48];
 static char s_logRing[LOG_LINES][LOG_COLS + 1];
@@ -570,10 +569,31 @@ enum
 	UPD_CHANNEL = 0,
 	UPD_AUTO,
 	UPD_ACTION,
-	UPD_UP,
-	UPD_DOWN,
+	UPD_OPEN, /* the notes box itself: opens the full-size notes view */
+	UPD_HEAD, /* the button on top of it, same action */
 	UPD_COUNT
 };
+/* The full-size notes view (a modal over the Updater page): rows, scroll buttons and CLOSE. */
+#define NOTE_MROWS 14
+static int s_notesOpen = 0;
+enum
+{
+	NM_UP = 0,
+	NM_DOWN,
+	NM_CLOSE,
+	NM_COUNT
+};
+#define NM_BTN_BASE 120
+
+static void ui_nm_rect(int i, int *x, int *y, int *w, int *h)
+{
+	switch (i)
+	{
+	case NM_UP: *x = 280; *y = 46; *w = 34; *h = 50; break;
+	case NM_DOWN: *x = 280; *y = 100; *w = 34; *h = 50; break;
+	default: *x = 6; *y = 210; *w = 308; *h = 26; break;
+	}
+}
 #define UPD_BTN_BASE 110
 
 static void ui_upd_rect(int i, int *x, int *y, int *w, int *h)
@@ -583,8 +603,8 @@ static void ui_upd_rect(int i, int *x, int *y, int *w, int *h)
 	case UPD_CHANNEL: *x = 6; *y = 44; *w = 151; *h = 24; break;
 	case UPD_AUTO: *x = 163; *y = 44; *w = 151; *h = 24; break;
 	case UPD_ACTION: *x = 6; *y = 72; *w = 308; *h = 24; break;
-	case UPD_UP: *x = 280; *y = 154; *w = 34; *h = 26; break;
-	default: *x = 280; *y = 182; *w = 34; *h = 26; break;
+	case UPD_OPEN: *x = 6; *y = 158; *w = 308; *h = 50; break;
+	default: *x = 6; *y = 140; *w = 308; *h = 16; break; /* UPD_HEAD */
 	}
 }
 
@@ -930,6 +950,34 @@ static void ui_draw_updater(void)
 	const int ftp = N3DS_FtpStatus();
 
 	Updater_GetStatus(&st);
+	if (s_notesOpen)
+	{
+		ui_header(32, TR("WHAT'S NEW", "NOVEDADES"), NULL);
+		ui_cell(6, 44, 270, 160, ui_shade(COL_BG, 14), COL_EDGE);
+		for (i = 0; i < NOTE_MROWS; i++)
+		{
+			const unsigned line = s_noteMScroll + (unsigned)i;
+
+			if (line < s_noteCount)
+			{
+				ui_text(10, 49 + (i * 11), 1, COL_LABEL, s_noteLines[line]);
+			}
+		}
+		if (s_noteCount == 0)
+		{
+			ui_text(10, 49, 1, TH->faint, TR("NOTHING TO SHOW YET.", "NADA QUE MOSTRAR TODAVIA."));
+		}
+		ui_nm_rect(NM_UP, &x, &y, &w, &h);
+		ui_button(x, y, w, h, COL_TAB_OFF, (s_pressBtn == NM_BTN_BASE + NM_UP));
+		ui_text_c(x + (w / 2), y + (h / 2) - 3, 1, COL_TEXT, "+");
+		ui_nm_rect(NM_DOWN, &x, &y, &w, &h);
+		ui_button(x, y, w, h, COL_TAB_OFF, (s_pressBtn == NM_BTN_BASE + NM_DOWN));
+		ui_text_c(x + (w / 2), y + (h / 2) - 3, 1, COL_TEXT, "-");
+		ui_nm_rect(NM_CLOSE, &x, &y, &w, &h);
+		ui_button(x, y, w, h, COL_BTN_OFF, (s_pressBtn == NM_BTN_BASE + NM_CLOSE));
+		ui_text_c(x + (w / 2), y + 9, 1, COL_TEXT, TR("CLOSE", "CERRAR"));
+		return;
+	}
 	ui_header(32, TR("UPDATER", "ACTUALIZADOR"), CTR_NATIVE_VERSION);
 
 	/* Channel and auto-check, as settings cells. */
@@ -1012,33 +1060,36 @@ static void ui_draw_updater(void)
 		ui_text(6, 116, 1, COL_WARN, TR("RUN THE INSTALLED CIA TO UPDATE", "USA EL CIA INSTALADO PARA ACTUALIZAR"));
 	}
 
-	/* Release notes (the newer releases of the channel, or the whole changelog when up to date). */
-	ui_header(142, TR("WHAT'S NEW", "NOVEDADES"), NULL);
-	ui_cell(6, 154, 270, 54, ui_shade(COL_BG, 14), COL_EDGE);
-	if (s_noteCount > 0)
+	/* Release notes (the newer releases of the channel, or the whole changelog when up to date): a preview box
+	 * under a button that says so; either opens the full-size view. */
 	{
-		for (i = 0; i < NOTE_ROWS; i++)
-		{
-			const unsigned line = s_noteScroll + (unsigned)i;
+		const int has = (s_noteCount > 0);
 
-			if (line < s_noteCount)
+		ui_upd_rect(UPD_HEAD, &x, &y, &w, &h);
+		ui_button(x, y, w, h, has ? COL_BTN_ACT : COL_TAB_OFF, (s_pressBtn == UPD_BTN_BASE + UPD_HEAD) || (s_pressBtn == UPD_BTN_BASE + UPD_OPEN));
+		ui_text(x + 6, y + 4, 1, has ? COL_TEXT : TH->faint, TR("WHAT'S NEW", "NOVEDADES"));
+		if (has)
+		{
+			const char *more = TR("OPEN >", "ABRIR >");
+
+			ui_text(x + w - 6 - ui_text_w(1, more), y + 4, 1, COL_TEXT, more);
+		}
+		ui_upd_rect(UPD_OPEN, &x, &y, &w, &h);
+		ui_cell(x, y, w, h, ui_shade(COL_BG, 14), COL_EDGE);
+		if (has)
+		{
+			for (i = 0; i < 4; i++)
 			{
-				ui_text(10, 159 + (i * 11), 1, COL_LABEL, s_noteLines[line]);
+				if ((unsigned)i < s_noteCount)
+				{
+					ui_text(x + 4, y + 4 + (i * 11), 1, COL_LABEL, s_noteLines[i]);
+				}
 			}
 		}
-		if (s_noteCount > NOTE_ROWS)
+		else
 		{
-			ui_upd_rect(UPD_UP, &x, &y, &w, &h);
-			ui_button(x, y, w, h, COL_TAB_OFF, (s_pressBtn == UPD_BTN_BASE + UPD_UP));
-			ui_text_c(x + (w / 2), y + 9, 1, COL_TEXT, "+");
-			ui_upd_rect(UPD_DOWN, &x, &y, &w, &h);
-			ui_button(x, y, w, h, COL_TAB_OFF, (s_pressBtn == UPD_BTN_BASE + UPD_DOWN));
-			ui_text_c(x + (w / 2), y + 9, 1, COL_TEXT, "-");
+			ui_text(x + 4, y + 4, 1, TH->faint, TR("NOTHING TO SHOW YET.", "NADA QUE MOSTRAR TODAVIA."));
 		}
-	}
-	else
-	{
-		ui_text(10, 159, 1, TH->faint, TR("NOTHING TO SHOW YET.", "NADA QUE MOSTRAR TODAVIA."));
 	}
 
 	/* The FTP side (developers): address while it listens, CANCEL in install-only mode. */
@@ -1493,14 +1544,15 @@ static void ui_press_updater(int i)
 			Updater_Check();
 		}
 		break;
-	case UPD_UP:
-		s_noteScroll = (s_noteScroll > 3U) ? (s_noteScroll - 3U) : 0U;
-		break;
-	default:
-		if (s_noteCount > NOTE_ROWS)
+	case UPD_OPEN:
+	case UPD_HEAD:
+		if (s_noteCount > 0)
 		{
-			s_noteScroll = (s_noteScroll + 3U <= s_noteCount - NOTE_ROWS) ? (s_noteScroll + 3U) : (s_noteCount - NOTE_ROWS);
+			s_notesOpen = 1;
+			s_noteMScroll = 0;
 		}
+		return; /* no pressed-button flash: the view itself is the feedback */
+	default:
 		break;
 	}
 	s_pressBtn = UPD_BTN_BASE + i;
@@ -1608,6 +1660,7 @@ void N3DS_BottomUi_Touch(void)
 		if ((t.px >= TABBTN_X0) && (i < n) && (((t.px - TABBTN_X0) % TABBTN_PITCH) < TABBTN_W))
 		{
 			s_tab = ids[i];
+			s_notesOpen = 0;
 			s_msg[0] = '\0';
 			s_dirty = 1;
 		}
@@ -1630,6 +1683,35 @@ void N3DS_BottomUi_Touch(void)
 		}
 		break;
 	case TAB_UPDATER:
+		if (s_notesOpen)
+		{
+			for (i = 0; i < NM_COUNT; i++)
+			{
+				int x, y, w, h;
+
+				ui_nm_rect(i, &x, &y, &w, &h);
+				if (ui_in(t.px, t.py, x, y, w, h))
+				{
+					if (i == NM_CLOSE)
+					{
+						s_notesOpen = 0;
+					}
+					else if (i == NM_UP)
+					{
+						s_noteMScroll = (s_noteMScroll > 4U) ? (s_noteMScroll - 4U) : 0U;
+					}
+					else if (s_noteCount > NOTE_MROWS)
+					{
+						s_noteMScroll = (s_noteMScroll + 4U <= s_noteCount - NOTE_MROWS) ? (s_noteMScroll + 4U) : (s_noteCount - NOTE_MROWS);
+					}
+					s_pressBtn = NM_BTN_BASE + i;
+					s_pressFrames = 8;
+					s_dirty = 1;
+					return;
+				}
+			}
+			break;
+		}
 		for (i = 0; i < UPD_COUNT; i++)
 		{
 			int x, y, w, h;
@@ -1781,12 +1863,12 @@ static void ui_updater_poll(void)
 		{
 			(void)Updater_GetNotes(s_noteRaw, sizeof(s_noteRaw));
 			s_noteCount = Update_FormatNotes(s_noteRaw, s_noteLines, NOTE_LINES);
-			s_noteScroll = 0;
+			s_noteMScroll = 0;
 		}
 		else if (st.state == UPDATE_CHECKING)
 		{
 			s_noteCount = 0;
-			s_noteScroll = 0;
+			s_noteMScroll = 0;
 		}
 		s_dirty = 1;
 	}
