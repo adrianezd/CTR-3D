@@ -20,10 +20,10 @@ struct SData *sdata = &s_sd;
 static int s_lastVbl = 2;
 int LOAD_IsOpen_Podiums(void) { return 0; }
 int Platform_LastFrameVBlanks(void) { return s_lastVbl; }
+static int s_vblankCount;
 
 /* framepace.c's outside world */
 int g_dbg_stereo = 1;
-static int s_vblankCount;
 static int s_oldClass;
 static int s_logLines;
 int Platform_GetVBlankCount(void) { return s_vblankCount; }
@@ -198,6 +198,7 @@ static void test_switch_back(void)
 /* ---------------------------------------------------------- frame pace --- */
 static void reset_pace(int mode)
 {
+	g_dbg_autoSim = 0;
 	g_dbg_frameCap = mode;
 	s_paceVbl = 2;
 	s_paceDwell = 0;
@@ -206,6 +207,11 @@ static void reset_pace(int mode)
 	s_pace60Windows = 0;
 	s_paceWinN = 0;
 	s_paceTarget = 2;
+	s_paceDeadlineOk = 0;
+	s_paceSkipNow = 0;
+	s_paceSkipRun = 0;
+	s_paceWait = 2;
+	s_paceRepSkips = 0;
 	s_logLines = 0;
 	g_fps60Allowed = 1;
 }
@@ -228,6 +234,38 @@ static int run_pace(int frames, unsigned (*work)(int vbl, int i), int *at60)
 		prev = v;
 	}
 	return changes;
+}
+
+/* The same loop on a real clock: a frame arrives after the longer of the wait
+ * it was given and the vblanks its work takes; a skipped draw is `skipWork`.
+ * Returns the vblanks elapsed; *skips = skipped draws. */
+static int run_clock(int frames, unsigned drawWork, unsigned skipWork, int *skips)
+{
+	static unsigned long long t; /* real time, us */
+	const int v0 = s_vblankCount;
+	unsigned long long due = 0;  /* the vblank the last submit told the next one to wait for */
+	int prevSkip = 0;
+
+	t = (unsigned long long)s_vblankCount * N3DS_PACE_VBLANK_US;
+	*skips = 0;
+	for (int i = 0; i < frames; i++)
+	{
+		const unsigned w = prevSkip ? skipWork : drawWork;
+
+		/* The frame's work, then (RenderVSYNC) the wait the last submit asked for. */
+		t += w;
+		if (t < due)
+		{
+			t = due;
+		}
+		s_vblankCount = (int)(t / N3DS_PACE_VBLANK_US);
+		N3DS_FramePaceNoteFrame(w);
+		N3DS_FramePaceNextFlip();
+		due = (unsigned long long)(s_vblankCount + N3DS_FramePaceWaitVBlanks()) * N3DS_PACE_VBLANK_US;
+		prevSkip = N3DS_FramePaceSkipDraw();
+		*skips += prevSkip;
+	}
+	return s_vblankCount - v0;
 }
 
 static unsigned work_light(int vbl, int i) { (void)vbl; (void)i; return 10000; }
@@ -259,8 +297,61 @@ static void test_pace(void)
 
 	reset_pace(0);
 	ch = run_pace(600, work_o3ds, &at60);
-	CHECK(s_paceVbl == 3 && at60 == 0, "AUTO 40 ms frames: vbl %d", s_paceVbl);
-	printf("ok   AUTO, 40 ms frames (Old 3DS): 30 -> 20, never 60\n");
+	CHECK(s_paceVbl == 2 && at60 == 0, "AUTO 40 ms frames: vbl %d", s_paceVbl);
+	printf("ok   AUTO, 40 ms frames (Old 3DS): stays at 30, never 20 or 60\n");
+
+	{
+		int skips;
+		int vbls;
+
+		/* 40 ms draws, 15 ms without one: game speed (2 vblanks a tick) holds
+		 * by skipping draws, never more than SKIP_RUN in a row. */
+		reset_pace(0);
+		run_clock(60, 40000, 15000, &skips);
+		vbls = run_clock(600, 40000, 15000, &skips);
+		CHECK(s_paceVbl == 2, "clock, 40 ms: vbl %d", s_paceVbl);
+		CHECK(vbls <= 600 * 2 + 12, "clock, 40 ms: %d vblanks for 600 ticks (game slowed)", vbls);
+		CHECK(skips > 100 && skips < 400, "clock, 40 ms: %d skipped draws", skips);
+		printf("ok   clock, 40 ms draws: %d vblanks for 600 ticks (1200 = full speed), %d draws skipped\n", vbls, skips);
+
+		/* Fits at 30: nothing is skipped. */
+		reset_pace(1);
+		vbls = run_clock(600, 25000, 10000, &skips);
+		CHECK(skips == 0 && vbls >= 1198 && vbls <= 1202, "clock, 25 ms: %d skips, %d vblanks", skips, vbls);
+		printf("ok   clock, 25 ms draws at 30: no draw skipped\n");
+
+		/* A stall (a load) resets the clock instead of skipping to catch up. */
+		reset_pace(1);
+		run_clock(10, 25000, 10000, &skips);
+		s_vblankCount += 8; /* the most one catch-up emits */
+		N3DS_FramePaceNoteFrame(25000);
+		N3DS_FramePaceNextFlip();
+		CHECK(!N3DS_FramePaceSkipDraw() && N3DS_FramePaceWaitVBlanks() == 2, "stall chased");
+		printf("ok   a stall resets the deadline clock\n");
+
+		/* The 60 Hz logic reads the planned interval while the clock runs, not
+		 * the measured one (a late 60 would be paid twice), and the measured
+		 * one when it does not. */
+		reset_pace(0);
+		s_paceVbl = 1;
+		run_clock(5, 10000, 10000, &skips);
+		CHECK(N3DS_FramePaceLastFrameVBlanks(2) == 1, "late 60 frame read as %d", N3DS_FramePaceLastFrameVBlanks(2));
+		reset_pace(2);
+		run_clock(5, 10000, 10000, &skips);
+		CHECK(N3DS_FramePaceLastFrameVBlanks(3) == 3, "OFF measured frame read as %d", N3DS_FramePaceLastFrameVBlanks(3));
+		printf("ok   60 Hz logic reads the planned interval under the clock\n");
+
+		/* OFF and menus never skip. */
+		reset_pace(2);
+		run_clock(100, 60000, 60000, &skips);
+		CHECK(skips == 0, "OFF skipped %d", skips);
+		reset_pace(1);
+		g_fps60Allowed = 0;
+		run_clock(100, 60000, 60000, &skips);
+		CHECK(skips == 0, "menu skipped %d", skips);
+		g_fps60Allowed = 1;
+		printf("ok   OFF and menus never skip a draw\n");
+	}
 
 	reset_pace(0);
 	ch = run_pace(3600, work_edge, &at60); /* 3600 frames at the edge (~2 min at 30) */
@@ -285,6 +376,7 @@ static void test_pace(void)
 	g_fps60Allowed = 0;
 	CHECK(N3DS_FramePaceFlipVBlanks() == 2, "OFF in a menu");
 	printf("ok   OFF: 1 vblank wherever allowed\n");
+
 }
 
 int main(void)

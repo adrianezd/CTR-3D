@@ -70,8 +70,16 @@ unsigned N3DS_FramePaceRightEyeUs(int *stereo);
 #define N3DS_PACE_LONG60         32
 #define N3DS_PACE_IGNORE_US      250000u
 #define N3DS_PACE_ST_MARGIN_US   3000u
+#define N3DS_PACE_SKIP_LATE      1 /* vblanks behind the deadline before a draw is skipped */
+#define N3DS_PACE_SKIP_RUN       2 /* skipped draws in a row, at most */
+#define N3DS_PACE_RESYNC_LATE    4 /* vblanks behind: a stall, reset the clock */
 
 int g_dbg_frameCap = 0;
+/* AUTO as the mzm / sm-3ds ports do it: the game's logic runs at 60 Hz whenever
+ * the context allows it (interval 1) and the deadline clock skips the draws
+ * the console cannot afford, so the picture shows whatever rate the console
+ * gives (35, 41, ...) at full game speed. 0: the older 60 / 30 stepping. */
+int g_dbg_autoSim = 0;
 
 static int s_paceVbl = 2;         /* the AUTO cap's current flip interval: 1, 2 or 3 */
 static int s_paceStereoOff = 0;   /* AUTO stereo dropped the right eye */
@@ -93,6 +101,12 @@ static int s_paceDwell;
 static int s_paceUpNeed60 = N3DS_PACE_UP_WINDOWS; /* backoff for 30 -> 60 */
 static int s_pace60Windows;                      /* windows since AUTO went to 60 */
 /* [PACE] report window (the [PERF] cadence), separate from the decision window. */
+static int s_paceDeadlineOk;  /* the deadline clock is running */
+static int s_paceDeadline;    /* the vblank the next submit is due at */
+static int s_paceWait;        /* vblanks the next flip waits (vsyncTillFlip) */
+static int s_paceSkipNow;     /* the frame being submitted skips its draw */
+static int s_paceSkipRun;
+static unsigned s_paceRepSkips;
 static unsigned s_paceRepN;
 static unsigned s_paceRepMiss;
 static unsigned s_paceRepMaxUs;
@@ -115,6 +129,10 @@ int N3DS_FramePaceFlipVBlanks(void)
 		return 2;
 	}
 	if (g_dbg_frameCap == 2)
+	{
+		return g_fps60Allowed ? 1 : 2;
+	}
+	if (g_dbg_autoSim)
 	{
 		return g_fps60Allowed ? 1 : 2;
 	}
@@ -166,7 +184,7 @@ static void N3DS_FramePaceDecide(void)
 	}
 	/* A 60 that does not hold drops at once, dwell or not: each window of it
 	 * is a visible stutter, and the backoff (not the dwell) spaces the tries. */
-	if ((g_dbg_frameCap == 0) && (s_paceVbl == 1) && (s_paceWinAt1 * 2 >= s_paceWinN) && (s_paceWinOver1 >= N3DS_PACE_MISS_DOWN))
+	if ((g_dbg_frameCap == 0) && !g_dbg_autoSim && (s_paceVbl == 1) && (s_paceWinAt1 * 2 >= s_paceWinN) && (s_paceWinOver1 >= N3DS_PACE_MISS_DOWN))
 	{
 		snprintf(msg, sizeof(msg), "%u/%u frames over 1 vblank", s_paceWinOver1, s_paceWinAt1);
 		N3DS_FramePaceChange(2, msg);
@@ -178,14 +196,9 @@ static void N3DS_FramePaceDecide(void)
 		return;
 	}
 
-	if (g_dbg_frameCap == 0)
+	if ((g_dbg_frameCap == 0) && !g_dbg_autoSim)
 	{
-		if ((s_paceVbl == 2) && (s_paceWinOver2 >= N3DS_PACE_MISS_DOWN))
-		{
-			snprintf(msg, sizeof(msg), "%u/%u frames over 2 vblanks", s_paceWinOver2, s_paceWinN);
-			N3DS_FramePaceChange(3, msg);
-			return;
-		}
+		/* No 30 -> 20 step: a console that misses 30 skips draws instead. */
 		if (s_paceVbl == 3)
 		{
 			s_paceUpStreak = (s_paceWinOverUp <= 1) ? (s_paceUpStreak + 1) : 0;
@@ -213,11 +226,11 @@ static void N3DS_FramePaceDecide(void)
 		return;
 	}
 	{
-		/* The budget 3D is held to: the slowest cap AUTO would pick (3D at 20
-		 * beats 2D at 30 -- the player raised the slider), or the forced one. */
-		const int stVbl = (g_dbg_frameCap == 1) ? 2 : 3;
+		/* The budget 3D is held to: 30 (AUTO no longer has a 20 step; below it
+		 * draws are skipped, which the right eye makes more frequent). */
+		const int stVbl = 2;
 		const unsigned budget = (unsigned)stVbl * N3DS_PACE_VBLANK_US;
-		const unsigned over = (stVbl == 2) ? s_paceWinOver2 : s_paceWinOver3;
+		const unsigned over = s_paceWinOver2;
 
 		if (!s_paceStereoOff && (s_paceWinStereoN * 2 >= s_paceWinN) && (s_paceWinStereoN != 0))
 		{
@@ -257,8 +270,72 @@ static int s_paceTarget = 2;
 
 int N3DS_FramePaceNextFlip(void)
 {
-	s_paceTarget = N3DS_FramePaceFlipVBlanks();
-	return s_paceTarget;
+	const int interval = N3DS_FramePaceFlipVBlanks();
+	const int now = Platform_GetVBlankCount();
+	int lateVbl;
+
+	s_paceTarget = interval;
+	s_paceSkipNow = 0;
+	s_paceWait = interval;
+	/* OFF, menus, loads and cutscenes keep the flat interval: no deadline,
+	 * no skipped draws. */
+	if ((g_dbg_frameCap == 2) || !g_fps60Allowed)
+	{
+		s_paceDeadlineOk = 0;
+		s_paceSkipRun = 0;
+		return interval;
+	}
+	if (!s_paceDeadlineOk)
+	{
+		s_paceDeadlineOk = 1;
+		s_paceDeadline = now + interval;
+		s_paceSkipRun = 0;
+		return interval;
+	}
+	lateVbl = now - s_paceDeadline;
+	if (lateVbl > N3DS_PACE_RESYNC_LATE)
+	{
+		s_paceDeadline = now + interval;
+		s_paceSkipRun = 0;
+		return interval;
+	}
+	if ((lateVbl >= N3DS_PACE_SKIP_LATE) && (s_paceSkipRun < N3DS_PACE_SKIP_RUN))
+	{
+		s_paceSkipNow = 1;
+		s_paceSkipRun++;
+		s_paceRepSkips++;
+	}
+	else
+	{
+		s_paceSkipRun = 0;
+	}
+	s_paceDeadline += interval;
+	s_paceWait = s_paceDeadline - now;
+	if (s_paceWait < 0)
+	{
+		s_paceWait = 0;
+	}
+	return interval;
+}
+
+int N3DS_FramePaceWaitVBlanks(void)
+{
+	return s_paceWait;
+}
+
+int N3DS_FramePaceSkipDraw(void)
+{
+	return s_paceSkipNow;
+}
+
+/* Emulated vblanks the frame that just ended counts for in the game's 60 Hz
+ * logic (Platform_LastFrameVBlanks). While the deadline clock runs, the
+ * planned interval and nothing else: the clock already makes up a late frame
+ * (wait 0, a skipped draw), so also reading it as a long frame would pay the
+ * same time twice, and a short catch-up frame must not read as a 60 fps one. */
+int N3DS_FramePaceLastFrameVBlanks(int measured)
+{
+	return s_paceDeadlineOk ? s_paceTarget : measured;
 }
 
 void N3DS_FramePaceNoteFrame(unsigned workUs)
@@ -267,7 +344,7 @@ void N3DS_FramePaceNoteFrame(unsigned workUs)
 	int stereoFrame = 0;
 	const unsigned rightUs = N3DS_FramePaceRightEyeUs(&stereoFrame);
 
-	if (workUs > N3DS_PACE_IGNORE_US)
+	if ((workUs > N3DS_PACE_IGNORE_US) || s_paceSkipNow)
 	{
 		return;
 	}
@@ -349,16 +426,17 @@ void N3DS_FramePaceFormat(char *out, int outSize)
 	 * or loading windows read low: nothing ticks then. */
 	snprintf(out, (size_t)outSize,
 	         "[PACE] cap=%d mode=%s old=%d frames=%u avgWorkUs=%u maxWorkUs=%u miss=%u changes=%u 3d=%s%s rEyeUs=%u logic=%u at60=%u speed=%u%% t30=%u vbl=%u "
-	         "sw=%u up60=%d",
+	         "sw=%u up60=%d skip=%u",
 	         60 / N3DS_FramePaceFlipVBlanks(), (g_dbg_frameCap == 1) ? "30" : (g_dbg_frameCap == 2) ? "off" : "auto", N3DS_FramePaceOldClass(), s_paceRepN,
 	         (unsigned)(s_paceRepWorkUs / n), s_paceRepMaxUs, s_paceRepMiss, s_paceRepChanges, (g_dbg_stereo == 0) ? "off" : (g_dbg_stereo == 2) ? "auto" : "on",
 	         N3DS_FramePaceStereoSuppressed() ? "(2D)" : "", s_paceRightLastUs, logic, at60, (vbl != 0) ? (unsigned)((half * 100u) / vbl) : 0u, t30, vbl,
-	         f.switches - s_paceRepFps0.switches, s_paceUpNeed60);
+	         f.switches - s_paceRepFps0.switches, s_paceUpNeed60, s_paceRepSkips);
 	s_paceRepN = 0;
 	s_paceRepMiss = 0;
 	s_paceRepMaxUs = 0;
 	s_paceRepWorkUs = 0;
 	s_paceRepChanges = 0;
+	s_paceRepSkips = 0;
 	s_paceRepVbl0 = vblNow;
 	s_paceRepFps0 = f;
 }
