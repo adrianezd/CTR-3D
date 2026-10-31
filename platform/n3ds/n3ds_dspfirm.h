@@ -22,5 +22,9 @@ int N3DS_DspFirm_Missing(void);          /* else damaged */
 const char *N3DS_DspFirm_Failure(void);  /* "ERROR n / code" after a failure */
 void N3DS_DspFirm_Answer(int yes);       /* the buttons */
 void N3DS_DspFirm_Pump(void);            /* once per input poll, game thread */
+void N3DS_DspFirm_FrameTick(void);       /* once per bottom-screen frame, game thread */
+
+/* Frames the "EXTRACTING..." box is on the screen before the extraction blocks the game thread. */
+#define N3DS_DSPFIRM_SHOWN_FRAMES 6
 
 #endif

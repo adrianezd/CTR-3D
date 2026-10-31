@@ -63,6 +63,16 @@ void N3DS_DspFirm_Answer(int yes)
 	}
 }
 
+/* Once per frame the bottom screen is drawn: counts the frames "EXTRACTING..." has been up for
+ * (the input is polled more often than the panel is painted, so the poll cannot do the counting). */
+void N3DS_DspFirm_FrameTick(void)
+{
+	if (s_state == N3DS_DSPFIRM_WORKING)
+	{
+		s_workFrames++;
+	}
+}
+
 /* The extraction takes a moment and blocks the game thread: it starts once "EXTRACTING..." has
  * been on the screen for a few frames. */
 void N3DS_DspFirm_Pump(void)
@@ -71,7 +81,7 @@ void N3DS_DspFirm_Pump(void)
 	char note[600];
 	DspFirmExtractResult r;
 
-	if ((s_state != N3DS_DSPFIRM_WORKING) || (++s_workFrames < 4))
+	if ((s_state != N3DS_DSPFIRM_WORKING) || (s_workFrames < N3DS_DSPFIRM_SHOWN_FRAMES))
 	{
 		return;
 	}

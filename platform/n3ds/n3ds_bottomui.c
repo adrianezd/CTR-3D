@@ -1996,6 +1996,7 @@ void N3DS_BottomUi_Frame(const struct N3DS_BottomUiGameInfo *gi)
 			s_lastDspq = dspq;
 			s_dirty = 1;
 		}
+		N3DS_DspFirm_FrameTick();
 	}
 	N3DS_FtpPoll();
 	ui_updater_poll();
