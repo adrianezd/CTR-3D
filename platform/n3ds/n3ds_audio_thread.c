@@ -19,6 +19,7 @@
 #include "n3ds_audio_thread.h"
 #include "n3ds_backend.h" /* N3DS_DebugLog only -- plain-scalar boundary header, no game types */
 #include "n3ds_beat.h"
+#include "n3ds_dspfirm.h"
 
 /*
  * Defined in native_audio.c (the unity build's own translation unit).
@@ -301,6 +302,7 @@ static void N3DS_NdspSinkInit(void)
 		 */
 		snprintf(line, sizeof(line), "[CTR-3DS] ndsp init FAILED (0x%08lx) -- dspfirm.cdc? audio stays muted", (unsigned long)rc);
 		N3DS_DebugLog(line);
+		N3DS_DspFirm_Raise(); /* the bottom screen asks to extract the firmware, if that is the reason */
 		return;
 	}
 
@@ -559,6 +561,16 @@ int N3DS_NdspSubmitMusicParcel(const short *frames, int frameCount, int sampleRa
 	}
 
 	return 1;
+}
+
+int N3DS_NdspRetryInit(void)
+{
+	if (!s_ndspUp && !s_ndspForcedOff)
+	{
+		s_ndspInitAttempted = 0;
+		N3DS_NdspSinkInit();
+	}
+	return s_ndspUp;
 }
 
 int N3DS_NdspIsUp(void)
