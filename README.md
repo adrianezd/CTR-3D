@@ -1,8 +1,10 @@
 # CTR 3D
 
-A New Nintendo 3DS homebrew port of Crash Team Racing (PS1, 1999).
+A Nintendo 3DS homebrew port of Crash Team Racing (PS1, 1999), for the New 3DS and, since v0.1.0, the Old 3DS and 2DS too.
 
-This is a fork of [CTR Native](https://github.com/CTR-tools/ctr-native), the native PC port of the game built on the [CTR-ModSDK](https://github.com/CTR-tools/CTR-ModSDK) decompilation. It starts from CTR Native beta 7.1 and adds a 3DS platform layer and a renderer for the 3DS GPU. The game runs at full speed on a New 3DS, with stereoscopic 3D on the slider, a genuinely widescreen top screen, and the map on the bottom screen.
+This is a fork of [CTR Native](https://github.com/CTR-tools/ctr-native), the native PC port of the game built on the [CTR-ModSDK](https://github.com/CTR-tools/CTR-ModSDK) decompilation. The 3DS platform layer and the renderer for the 3DS GPU come from [zando95/CTR-3D](https://github.com/zando95/CTR-3D), which first brought the game to the New 3DS. This fork adds Old 3DS / 2DS support, races unlocked to 60 FPS, the race HUD on the bottom screen, reworked stereoscopic 3D and an in-game updater.
+
+On a New 3DS the game runs with stereoscopic 3D on the slider, a genuinely widescreen top screen, and the HUD and map on the bottom screen. Races reach about 45-60 FPS there and about 25-30 FPS on an Old 3DS / 2DS (the PS1 original ran at 30). Not every track and mode has been played through yet; bug reports are welcome.
 
 As far as we can determine, this is the first PlayStation decompilation ported to 3DS homebrew. Fittingly, CTR was Nintendo's internal codename for the 3DS.
 
@@ -20,16 +22,20 @@ The goal is a game that could pass for a retail 3DS port: faithful to the origin
 
 ## Requirements
 
-- A **New** Nintendo 3DS, New 3DS XL, or New 2DS XL. The original 3DS and 2DS do not have the CPU for it and are not supported.
+- Any Nintendo 3DS family console: New 3DS, New 3DS XL, New 2DS XL, or the original 3DS, 3DS XL and 2DS. The Old 3DS / 2DS are slower (see above); menus run near 30 FPS there and the track select preview video at about 12 FPS.
 - Custom firmware with the Homebrew Launcher ([Luma3DS](https://github.com/LumaTeam/Luma3DS)). If your console is not modded yet, [3ds.hacks.guide](https://3ds.hacks.guide/) is the place to start.
 - A one-time DSP firmware dump, or the game will be silent: open the Rosalina menu (default **L + Down + Select**), choose Miscellaneous options, then Dump DSP firmware.
 - Your own NTSC-U (North American) retail CTR disc image, in the common raw PSX BIN layout: MODE2/2352 sectors, data track starting at byte 0. A cooked 2048-byte `.iso` drops the XA and STR sectors that music, voices and video need.
 
 ## Install
 
-1. Download the zip from the Releases page and extract it onto the root of your SD card. It mirrors the card's layout, so the game lands at `/3ds/ctr_native/ctr_native.3dsx`.
-2. Copy your disc image to `/3ds/ctr_native/assets/ctr-u.bin`. The `assets` folder contains a text file marking the spot.
-3. Launch it from the Homebrew Launcher, where it appears as CTR 3D, or install the CIA with FBI and start it from the HOME menu. Data always lives in `/3ds/ctr_native/`.
+1. Download `ctr3d-vX.Y.Z.cia` from the Releases page (or scan the QR code in the release) and install it with FBI. It appears on the HOME menu as CTR 3D.
+2. Copy your disc image to `/3ds/ctr_native/assets/ctr-u.bin`.
+3. Start it from the HOME menu. Data always lives in `/3ds/ctr_native/`.
+
+Releases ship the CIA only: a `.3dsx` launched from the Homebrew Launcher does not get the New 3DS's full app memory. `./build3ds.sh` still builds one locally (see below).
+
+The bottom screen's **Updater** tab can check GitHub for newer releases (stable, or stable plus betas), show what changed and install them itself.
 
 Saves are written to `/3ds/ctr_native/memcards/`, in the same files the PC port uses, so progress can be copied between console and PC.
 
@@ -53,9 +59,9 @@ Buttons follow their position on the PlayStation pad, not their letter:
 
 The screens:
 
-- The bottom screen always shows the in-race map, enlarged. The top screen starts in speedometer mode; X puts the map there too, as Triangle does on PS1. In Adventure mode the hub map moves to the bottom screen as well.
-- A frame-rate readout sits in the top-right corner of the bottom screen.
-- The 3D slider works in real time.
+- The bottom screen has touch tabs: Status, Map, Options and Updater. In a race, the Map tab shows the enlarged map with the HUD around it: clock, lap, fruit and wumpa count, speedometer, and the ranking of all 8 drivers with your own row highlighted. The top screen starts in speedometer mode; X puts the map there too, as Triangle does on PS1. In Adventure mode the hub map moves to the bottom screen as well.
+- The Options tab has AUTO-HIDE HUD (the top screen drops the HUD while the Map tab is up), 3D EFFECT, FRAME SKIP, SHOW FPS, a colour theme and, on a New 3DS, CPU 804 MHZ.
+- The 3D slider works in real time. On an Old 3DS / 2DS, 3D EFFECT defaults to AUTO and turns itself off if the game runs slow.
 
 The main menu has an **OPTIONS** entry with four toggles: PAL PENTA (Penta Penguin's PAL/Japanese stats), RESERVES METER (the boost-reserves bar), BOTTOM MAP, and TEXTURE FILTER. They return to their defaults on every launch. VS and Battle modes are not on the menu; one console has one controller.
 
@@ -70,8 +76,10 @@ To attach a log, create an empty file named `enable-log.txt` in `/3ds/ctr_native
 Everything here is on by default unless it says otherwise. The toggles are the OPTIONS menu rows.
 
 - **Widescreen.** The top screen renders a wider field of view, not a stretched 4:3 image.
-- **Stereoscopic 3D** on the slider.
-- **The map on the bottom screen**, with the top-screen slot switching between speedometer and map. Toggle.
+- **Stereoscopic 3D** on the slider. The kart sits at the screen surface and the track goes into the screen; text and menus come out in whole pixels.
+- **Races run unlocked to 60 FPS** instead of the PS1's 30, with FRAME SKIP to hold the pace on slower consoles.
+- **Old 3DS / 2DS support**, with faster level loads (a few seconds).
+- **The race HUD and the map on the bottom screen**, with the top-screen slot switching between speedometer and map. Toggle.
 - **Penta Penguin has his PAL and Japanese stats**, the maximum in every class, instead of the NTSC-U ones. Toggle.
 - **A boost-reserves meter** next to the power-slide meter, following the community ReservesMeter mod's design. Toggle.
 - **Texture filtering.** Toggle, off by default.
@@ -85,7 +93,7 @@ The PC build from this repository carries the changes that are not 3DS-specific:
 
 ## Building from source
 
-### New Nintendo 3DS
+### Nintendo 3DS
 
 Install [devkitPro](https://devkitpro.org/) with the `3ds-dev` package group, then:
 
@@ -177,6 +185,7 @@ GPL-3.0, inherited from CTR Native and CTR-ModSDK; see [LICENSE](LICENSE). Third
 
 ## Credits
 
+- [zando95/CTR-3D](https://github.com/zando95/CTR-3D) — the 3DS port this fork is based on: the 3DS platform layer and renderer
 - [CTR Native](https://github.com/CTR-tools/ctr-native) — the native PC port this project is a fork of
 - [CTR-ModSDK](https://github.com/CTR-tools/CTR-ModSDK) — the decompilation project both are built on
 - [ReservesMeter](https://github.com/CTR-tools/CTR-ModSDK/tree/main/mods/Modules/ReservesMeter) by Superstarxalien — the in-race boost-reserves meter's design (geometry, fill scale, colors) follows this community mod
