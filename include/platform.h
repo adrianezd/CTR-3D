@@ -30,6 +30,10 @@ int Platform_FlipVBlanks(void);
 /* Emulated vblanks between the last two flips (1 = the last frame was shown
  * at 60 fps). The 60 fps game logic (game/MAIN/MainFps60.c) keys off it. */
 int Platform_LastFrameVBlanks(void);
+/* The frame being submitted skips its DrawOTag (3DS FRAME SKIP AUTO / 30 when
+ * the console falls behind its deadline); the screen keeps the last picture.
+ * Valid after Platform_FlipVBlanks, which decides it. 0 off-3DS. */
+int Platform_SkipDraw(void);
 void Platform_WaitUntilVBlank(int targetVBlank);
 void Platform_PollHostEvents(void);
 int Platform_PollInput(void);

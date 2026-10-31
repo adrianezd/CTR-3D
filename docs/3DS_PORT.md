@@ -283,14 +283,20 @@ FRAME CAP `fpscap` is migrated: AUTO and 30 keep, 20 becomes AUTO). The game fli
 after `vsyncTillFlip` emulated vblanks, set at each submit from
 `Platform_FlipVBlanks`: 1 (60 fps), 2 (30 fps, retail) or 3 (20 fps). The policy is
 `platform/n3ds/n3ds_framepace.c` (host test: `platform/n3ds/tests/run-fps60-tests.py`):
-- AUTO (default, every console): 60 while frames fit, one step down (30, then 20)
-  when 8 of 32 frames miss the current interval, one step up after two 32-frame
-  windows with at most one frame over the faster interval minus a margin (4 ms for
-  20 -> 30, 3 ms for 30 -> 60, i.e. 13.7 ms of work). Two windows of dwell after
-  each change; a 60 that misses drops at once, and if it held less than 8 windows
-  the next 30 -> 60 waits twice as long (2, 4, ... 64 windows, reset after 32
-  windows at 60), so a scene on the edge settles at 30 instead of flickering. An
-  Old 3DS normally sits at 30 or 20 as before.
+- AUTO (default, every console), `g_dbg_autoSim` = 1 (off by default, experimental): the mzm / sm-3ds model. Where the game
+  allows 60 (racing) the logic runs at 60 Hz (interval 1) and the deadline clock below
+  skips the draws the console cannot afford, so the picture shows whatever rate the console
+  gives at full game speed; menus and loads stay at 30. With `g_dbg_autoSim` = 0 the older
+  policy applies: 60 while frames fit, one step down to 30 when 8 of 32 frames miss 60,
+  back up after two quiet windows (backoff 2 .. 64). Neither has a 20 fps step.
+- Skipped draws (AUTO and 30, where the game allows 60, i.e. racing): the flip is paced
+  against a deadline clock in emulated vblanks that advances by the interval at every
+  submit, so the logic keeps one tick per interval. A frame that arrives 8 ms or more
+  after its deadline is built and submitted WITHOUT its `DrawOTag`
+  (`Platform_SkipDraw`; the screen keeps the last picture) and the next flip waits only
+  for what is left of the clock. At most 3 draws in a row are skipped; a frame more than
+  8 vblanks late (load, stall) resets the clock. Skipped iterations are left out of the
+  decision windows. Pattern of mzm / sm-3ds (LOCK 30 / AUTO). `[PACE]` shows `skip=N`.
 - OFF: 1 vblank whenever the context allows it; a frame that does not fit simply
   takes the vblanks it needs.
 - 30: always 2 vblanks, the retail cadence and code paths.

@@ -1863,9 +1863,23 @@ void RenderSubmit(struct GameTracker *gGT)
 	gGT->frontBuffer = &gGT->db[1 - gGT->swapchainIndex];
 #endif
 
-	gGT->bool_DrawOTag_InProgress = 1;
-
 	void *ot = &gGT->pushBuffer[0].ptrOT[0x3ff];
+
+#if defined(CTR_NATIVE)
+	// 3DS FRAME SKIP: a frame that is behind its deadline is built (the logic
+	// and the state the build moves still run) but not drawn; the screen keeps
+	// the last picture and the pacer waits only for what is left of the clock.
+	if (Platform_SkipDraw())
+	{
+		gGT->frameTimer_notPaused = gGT->frameTimer_VsyncCallback;
+#if defined(CTR_INTERNAL)
+		NativePerf_EndScope(NATIVE_PERF_BUCKET_RENDER_SUBMIT);
+#endif
+		return;
+	}
+#endif
+
+	gGT->bool_DrawOTag_InProgress = 1;
 
 	MAINFRAME_PERF_BEGIN(NATIVE_PERF_BUCKET_SUBMIT_DRAWOTAG);
 	DrawOTag(ot);
