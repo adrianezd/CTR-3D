@@ -165,6 +165,10 @@ int N3DS_NdspSubmitMusicParcel(const short *frames, int frameCount, int sampleRa
  * one (mixer still renders; nothing is audible). */
 int N3DS_NdspIsUp(void);
 
+/* Tries the ndsp sink again after the DSP firmware file has been put on the SD card (the first
+ * attempt failed, and the attempt latch would refuse a second one). Returns whether it is up. */
+int N3DS_NdspRetryInit(void);
+
 /* Diagnostics for the renderer's periodic audio shape line: current
  * queued/playing parcel count (one vblank of audio each, whatever the source
  * rate), and cumulative parcels dropped because the pool was full (or a

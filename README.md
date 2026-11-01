@@ -24,7 +24,7 @@ The goal is a game that could pass for a retail 3DS port: faithful to the origin
 
 - Any Nintendo 3DS family console: New 3DS, New 3DS XL, New 2DS XL, or the original 3DS, 3DS XL and 2DS. The Old 3DS / 2DS are slower (see above); menus run near 30 FPS there and the track select preview video at about 12 FPS.
 - Custom firmware with the Homebrew Launcher ([Luma3DS](https://github.com/LumaTeam/Luma3DS)). If your console is not modded yet, [3ds.hacks.guide](https://3ds.hacks.guide/) is the place to start.
-- A one-time DSP firmware dump, or the game will be silent: open the Rosalina menu (default **L + Down + Select**), choose Miscellaneous options, then Dump DSP firmware.
+- A DSP firmware dump from your console, or the game will be silent. You do not have to make it yourself: if the audio cannot start, the game offers to extract it from your own console. (By hand: Rosalina menu, default **L + Down + Select**, Miscellaneous options, Dump DSP firmware.)
 - Your own NTSC-U (North American) retail CTR disc image, in the common raw PSX BIN layout: MODE2/2352 sectors, data track starting at byte 0. A cooked 2048-byte `.iso` drops the XA and STR sectors that music, voices and video need.
 
 ## Install
@@ -77,8 +77,9 @@ Everything here is on by default unless it says otherwise. The toggles are the O
 
 - **Widescreen.** The top screen renders a wider field of view, not a stretched 4:3 image.
 - **Stereoscopic 3D** on the slider. The kart sits at the screen surface and the track goes into the screen; text and menus come out in whole pixels.
-- **Races run unlocked to 60 FPS** instead of the PS1's 30, with FRAME SKIP to hold the pace on slower consoles.
+- **Races run unlocked to 60 FPS** instead of the PS1's 30. FRAME SKIP holds the game's speed on slower consoles by skipping some drawn frames instead of slowing down.
 - **Old 3DS / 2DS support**, with faster level loads (a few seconds).
+- **A HOME Menu icon, banner and banner sound** of its own.
 - **The race HUD and the map on the bottom screen**, with the top-screen slot switching between speedometer and map. Toggle.
 - **Penta Penguin has his PAL and Japanese stats**, the maximum in every class, instead of the NTSC-U ones. Toggle.
 - **A boost-reserves meter** next to the power-slide meter, following the community ReservesMeter mod's design. Toggle.

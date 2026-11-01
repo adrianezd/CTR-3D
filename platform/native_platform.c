@@ -1322,6 +1322,9 @@ int Platform_FlipVBlanks(void)
 		const int d = s_nativeVBlankCount - s_paceLastFlipVBlank;
 
 		s_paceLastFrameVBlanks = (d < 1) ? 1 : d;
+#if defined(__3DS__)
+		s_paceLastFrameVBlanks = N3DS_FramePaceLastFrameVBlanks(s_paceLastFrameVBlanks);
+#endif
 	}
 	s_paceLastFlipVBlank = s_nativeVBlankCount;
 	s_paceLastFlipCounter = now;
@@ -1336,11 +1339,24 @@ int Platform_FlipVBlanks(void)
 
 		N3DS_FramePaceNoteFrame((workUs > 0xFFFFFFFFull) ? 0xFFFFFFFFu : (unsigned)workUs);
 	}
-	return N3DS_FramePaceNextFlip();
+	/* A frame given no wait never reached VSync(0): bring the count up to the
+	 * clock so the deadline sees real lateness. */
+	Native_CatchUpDueVBlanks();
+	N3DS_FramePaceNextFlip();
+	return N3DS_FramePaceWaitVBlanks();
 #else
 	(void)last;
 	(void)idle;
 	return 2;
+#endif
+}
+
+int Platform_SkipDraw(void)
+{
+#if defined(__3DS__)
+	return N3DS_FramePaceSkipDraw();
+#else
+	return 0;
 #endif
 }
 

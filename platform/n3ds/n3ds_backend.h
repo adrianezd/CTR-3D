@@ -784,7 +784,9 @@ int N3DS_ExtraCoresUsable(void);    /* New 3DS and not simulating an Old one */
  * down: 2 emulated vblanks (30 fps) is retail. Platform_FlipVBlanks
  * (native_platform.c) measures each frame's WORK -- flip to flip minus the
  * time the pacer slept -- hands it to N3DS_FramePaceNoteFrame and returns
- * N3DS_FramePaceNextFlip: 1 (60 fps), 2 or 3 (20 fps). Option FRAME SKIP
+ * N3DS_FramePaceNextFlip: 1 (60 fps), 2 (30) or 3 (20, no longer chosen by
+ * AUTO: it skips draws against a deadline clock instead, see n3ds_framepace.c;
+ * N3DS_FramePaceWaitVBlanks / SkipDraw carry the result). Option FRAME SKIP
  * (g_dbg_frameCap, cfg `fpsmode`; the old `fpscap` is migrated): 0 AUTO, 1 30
  * FPS, 2 OFF. AUTO, on every console: 60 while the frames fit, one step down
  * (30, then 20) while a quarter of them miss, back up once they all fit with
@@ -802,6 +804,9 @@ int N3DS_ExtraCoresUsable(void);    /* New 3DS and not simulating an Old one */
  */
 void N3DS_FramePaceNoteFrame(unsigned workUs);
 int N3DS_FramePaceNextFlip(void);         /* the interval for the frame just submitted */
+int N3DS_FramePaceWaitVBlanks(void);      /* vblanks the next flip waits: the interval, or what is left of the deadline */
+int N3DS_FramePaceSkipDraw(void);         /* the frame just submitted skips its DrawOTag */
+int N3DS_FramePaceLastFrameVBlanks(int measured); /* what the 60 Hz logic reads as the last frame's vblanks */
 int N3DS_FramePaceFlipVBlanks(void);
 unsigned int N3DS_SysMs(void);             /* wraps after ~49 days; for stage timers */
 int N3DS_FramePaceOldClass(void);          /* Old 3DS / 2DS, or simulating one */
