@@ -26,6 +26,16 @@ int g_modIcy = 0;
 #define MOD_ENGINE_CLASSES 5
 #define MOD_ENGINE_UNLIMITED 4
 
+/* Skins (defined further down) */
+static void NativeMods_SkinInit(void);
+static void NativeMods_SkinInstallNames(void);
+static void NativeMods_SkinApplyIcon(s32 c);
+static void NativeMods_LoadSkinModels(void);
+static struct Model *NativeMods_FindSkinModel(char *searchName);
+static void NativeMods_SkinCharacterMenu(void);
+static u8 s_skinOn[16];
+static struct Model *s_skinModel[16];
+
 /* ------------------------------------------------------------------ strings --- */
 
 /* Arcade difficulty rows added by ExtraDifficulty. Uppercase ASCII only (no accented glyphs). */
@@ -57,6 +67,7 @@ void NativeMods_InstallStrings(void)
 
 	sdata->lngStrings[LNG_UNUSED_0ED] = (char *)s_modSuperHard[NativeMods_Lang()];
 	sdata->lngStrings[LNG_UNUSED_0EE] = (char *)s_modUltraHard[NativeMods_Lang()];
+	NativeMods_SkinInstallNames();
 }
 
 /* ------------------------------------------------------------- EngineSelect --- */
@@ -401,6 +412,10 @@ void *NativeMods_PoolAlloc(int size)
 
 void NativeMods_ClearRivalModels(void)
 {
+	for (s32 c = 0; c < 16; c++)
+	{
+		s_skinModel[c] = NULL;
+	}
 	for (s32 i = 0; i < 8; i++)
 	{
 		s_rivalModels[i].fileBase = NULL;
@@ -416,6 +431,7 @@ void NativeMods_ResolveRivalModels(void)
 			s_rivalModels[i].model = (struct Model *)((u8 *)s_rivalModels[i].fileBase + LOAD_MODEL_FILE_HEADER_BYTES);
 		}
 	}
+	NativeMods_LoadSkinModels();
 }
 
 void NativeMods_StoreRivalModelPtrs(struct GameTracker *gGT)
@@ -433,6 +449,12 @@ void NativeMods_StoreRivalModelPtrs(struct GameTracker *gGT)
 
 struct Model *NativeMods_FindRivalModel(char *searchName)
 {
+	struct Model *skin = NativeMods_FindSkinModel(searchName);
+
+	if (skin != NULL)
+	{
+		return skin;
+	}
 	for (s32 i = 0; i < 8; i++)
 	{
 		struct Model *m = s_rivalModels[i].model;
@@ -550,6 +572,8 @@ void NativeMods_CharacterMenuFrame(void)
 {
 	u32 tap = sdata->buttonTapPerPlayer[0];
 	s32 character = data.characterIDs[0];
+
+	NativeMods_SkinCharacterMenu();
 
 	if (!g_modPaintJobs || (character < 0) || (character >= MOD_PAINT_CHARACTERS))
 	{
@@ -1001,6 +1025,298 @@ void NativeMods_CustomCupsDraw(s32 cup, s32 x, s32 y)
 	}
 }
 
+/* ------------------------------------------------------------------- Skins --- */
+
+/* Per-character skins built by tools/make_skins.py from a character-pack disc into
+ * <base dir>/skins/: skin_NN.ctr (the pack's high-LOD model) and skins.dat (names, HUD icon pixels
+ * and CLUT, original and pack). SELECT in the arcade character select switches the highlighted
+ * character; the choice is kept in skins.cfg. A skinned character races with the pack model (any
+ * mode that loads drivers), shows the pack icon and name; the menu's own 3D models stay retail.
+ * The pack models are untextured and the pack icons overwrite only the 16 icon rectangles, so
+ * skinned and retail characters mix freely. */
+#define MOD_SKIN_ICON_MAX (16 * 32)
+#define MOD_SKIN_CLUT_MAX 256
+
+struct NativeModSkin
+{
+	b32 hasModel;
+	char longName[32];
+	char shortName[16];
+	RECT16 icon;
+	RECT16 clut;
+	u16 iconPix[2][MOD_SKIN_ICON_MAX]; /* [0] retail, [1] pack */
+	u16 clutPix[2][MOD_SKIN_CLUT_MAX];
+};
+
+static struct NativeModSkin s_skin[MOD_CHARACTERS];
+static b32 s_skinTried;
+static b32 s_skinReady;
+static char *s_skinRetailLong[MOD_CHARACTERS];
+static char *s_skinRetailShort[MOD_CHARACTERS];
+
+static s32 NativeMods_SkinPath(char *path, size_t size, const char *file)
+{
+	char rel[64];
+
+	snprintf(rel, sizeof(rel), "skins/%s", file);
+	return NativePath_Join(path, size, NativeStr8_FromCString(NativeAssets_GetBaseDir()), NativeStr8_FromCString(rel));
+}
+
+static void NativeMods_SkinSaveChoices(void)
+{
+	char path[1024];
+	FILE *file;
+
+	if (!NativeMods_SkinPath(path, sizeof(path), "skins.cfg") || ((file = fopen(path, "wb")) == NULL))
+	{
+		return;
+	}
+	for (s32 c = 0; c < MOD_CHARACTERS; c++)
+	{
+		fputc(s_skinOn[c] ? '1' : '0', file);
+	}
+	fputc('\n', file);
+	fclose(file);
+}
+
+static void NativeMods_SkinInit(void)
+{
+	char path[1024];
+	FILE *file;
+	u32 header[2];
+
+	if (s_skinTried)
+	{
+		return;
+	}
+	s_skinTried = true;
+
+	if (!NativeMods_SkinPath(path, sizeof(path), "skins.dat") || ((file = fopen(path, "rb")) == NULL))
+	{
+		return;
+	}
+
+	if ((fread(header, sizeof(header), 1, file) == 1) && (header[0] == 0x314e4b53u /* "SKN1" */) && (header[1] == MOD_CHARACTERS))
+	{
+		b32 ok = true;
+
+		for (s32 c = 0; ok && (c < MOD_CHARACTERS); c++)
+		{
+			struct NativeModSkin *s = &s_skin[c];
+			u32 hasModel;
+			u16 r[8];
+
+			ok = (fread(&hasModel, 4, 1, file) == 1) && (fread(s->longName, 32, 1, file) == 1) && (fread(s->shortName, 16, 1, file) == 1) &&
+			     (fread(r, sizeof(r), 1, file) == 1);
+			if (!ok)
+			{
+				break;
+			}
+			s->longName[31] = 0;
+			s->shortName[15] = 0;
+			s->hasModel = hasModel != 0;
+			s->icon = (RECT16){(s16)r[0], (s16)r[1], (s16)r[2], (s16)r[3]};
+			s->clut = (RECT16){(s16)r[4], (s16)r[5], (s16)r[6], (s16)r[7]};
+
+			u32 iconCount = (u32)r[2] * r[3];
+			u32 clutCount = (u32)r[6] * r[7];
+			ok = (iconCount <= MOD_SKIN_ICON_MAX) && (clutCount <= MOD_SKIN_CLUT_MAX) && (fread(s->iconPix[0], 2, iconCount, file) == iconCount) &&
+			     (fread(s->iconPix[1], 2, iconCount, file) == iconCount) && (fread(s->clutPix[0], 2, clutCount, file) == clutCount) &&
+			     (fread(s->clutPix[1], 2, clutCount, file) == clutCount);
+		}
+		s_skinReady = ok;
+	}
+	fclose(file);
+
+	if (s_skinReady && NativeMods_SkinPath(path, sizeof(path), "skins.cfg") && ((file = fopen(path, "rb")) != NULL))
+	{
+		for (s32 c = 0; c < MOD_CHARACTERS; c++)
+		{
+			int ch = fgetc(file);
+			s_skinOn[c] = (ch == '1') && s_skin[c].hasModel;
+		}
+		fclose(file);
+	}
+}
+
+static void NativeMods_SkinApplyIcon(s32 c)
+{
+	struct NativeModSkin *s = &s_skin[c];
+	s32 which = s_skinOn[c] ? 1 : 0;
+
+	if (!s_skinReady || (s->icon.w == 0))
+	{
+		return;
+	}
+	LoadImage(&s->icon, s->iconPix[which]);
+	if (s->clut.w != 0)
+	{
+		LoadImage(&s->clut, s->clutPix[which]);
+	}
+}
+
+static void NativeMods_SkinApplyName(s32 c)
+{
+	struct MetaDataCHAR *mdc = &data.MetaDataCharacters[c];
+
+	if (!s_skinReady || (sdata->lngStrings == NULL))
+	{
+		return;
+	}
+	if (s_skinRetailLong[c] == NULL)
+	{
+		return;
+	}
+	sdata->lngStrings[mdc->name_LNG_long] = s_skinOn[c] ? s_skin[c].longName : s_skinRetailLong[c];
+	sdata->lngStrings[mdc->name_LNG_short] = s_skinOn[c] ? s_skin[c].shortName : s_skinRetailShort[c];
+}
+
+/* After every LOAD_LangFile: remember the retail names of this language, then put the skins' on. */
+static void NativeMods_SkinInstallNames(void)
+{
+	NativeMods_SkinInit();
+	if (!s_skinReady || (sdata->lngStrings == NULL))
+	{
+		return;
+	}
+
+	for (s32 c = 0; c < MOD_CHARACTERS; c++)
+	{
+		struct MetaDataCHAR *mdc = &data.MetaDataCharacters[c];
+		char *curLong = sdata->lngStrings[mdc->name_LNG_long];
+		char *curShort = sdata->lngStrings[mdc->name_LNG_short];
+
+		if (curLong != s_skin[c].longName)
+		{
+			s_skinRetailLong[c] = curLong;
+		}
+		if (curShort != s_skin[c].shortName)
+		{
+			s_skinRetailShort[c] = curShort;
+		}
+		NativeMods_SkinApplyName(c);
+	}
+}
+
+/* Load the pack model of every skinned character in this race into the main MEMPACK. Skipped
+ * (retail model kept) when it would not fit, rather than stopping on the out-of-memory screen. */
+static void NativeMods_LoadSkinModels(void)
+{
+	struct GameTracker *gGT = sdata->gGT;
+	struct Mempack *saved;
+
+	for (s32 c = 0; c < MOD_CHARACTERS; c++)
+	{
+		s_skinModel[c] = NULL;
+	}
+
+	NativeMods_SkinInit();
+	if (!s_skinReady || (gGT->gameMode1 & (MAIN_MENU | GAME_CUTSCENE)))
+	{
+		return;
+	}
+
+	saved = sdata->PtrMempack;
+	MEMPACK_SwapPacks(LOAD_MAIN_PACK_INDEX);
+
+	for (s32 i = 0; i < 8; i++)
+	{
+		s32 c = data.characterIDs[i];
+		char path[1024];
+		char file[32];
+		FILE *f;
+		long size;
+
+		if ((c < 0) || (c >= MOD_CHARACTERS) || !s_skinOn[c] || (s_skinModel[c] != NULL))
+		{
+			continue;
+		}
+
+		snprintf(file, sizeof(file), "skin_%02d.ctr", (int)c);
+		if (!NativeMods_SkinPath(path, sizeof(path), file) || ((f = fopen(path, "rb")) == NULL))
+		{
+			continue;
+		}
+
+		if ((fseek(f, 0, SEEK_END) == 0) && ((size = ftell(f)) > 8) && (fseek(f, 0, SEEK_SET) == 0) && (MEMPACK_GetFreeBytes() > (int)size + 0x20000))
+		{
+			char *buf = MEMPACK_AllocMem((int)size);
+
+			if (fread(buf, 1, (size_t)size, f) == (size_t)size)
+			{
+				int ptrMapOffset = *(int *)buf;
+				char *real = buf + 4;
+
+				if ((ptrMapOffset >= 0) && (ptrMapOffset + 8 <= size))
+				{
+					struct DramPointerMap *dpm = (struct DramPointerMap *)&real[ptrMapOffset];
+					LOAD_RunPtrMap(real, (int *)DRAM_GETOFFSETS(dpm), dpm->numBytes >> 2);
+				}
+				s_skinModel[c] = (struct Model *)real;
+			}
+		}
+		fclose(f);
+	}
+
+	sdata->PtrMempack = saved;
+
+	/* modes that load the player (and ghost/boss) into driverModelExtras take the skin there too */
+	for (s32 i = 0; i < LOAD_DRIVER_MODEL_EXTRA_COUNT; i++)
+	{
+		struct Model *m = data.driverModelExtras[i].model;
+
+		if (m == NULL)
+		{
+			continue;
+		}
+		for (s32 c = 0; c < MOD_CHARACTERS; c++)
+		{
+			if ((s_skinModel[c] != NULL) && VehBirth_ModelNameEquals(s_skinModel[c], m->name))
+			{
+				data.driverModelExtras[i].model = s_skinModel[c];
+				break;
+			}
+		}
+	}
+}
+
+static struct Model *NativeMods_FindSkinModel(char *searchName)
+{
+	for (s32 c = 0; c < MOD_CHARACTERS; c++)
+	{
+		if ((s_skinModel[c] != NULL) && VehBirth_ModelNameEquals(s_skinModel[c], searchName))
+		{
+			return s_skinModel[c];
+		}
+	}
+	return NULL;
+}
+
+static const char *const s_modSkinHint[MOD_LANGS] = {"SELECT: SKIN", "SELECT: APPARENCE", "SELECT: AUSSEHEN", "SELECT: ASPETTO", "SELECT: ASPECTO", "SELECT: UITERLIJK"};
+
+/* Character select, player one: SELECT switches the highlighted character's skin. */
+static void NativeMods_SkinCharacterMenu(void)
+{
+	s32 c = data.characterIDs[0];
+
+	NativeMods_SkinInit();
+	if (!s_skinReady || (c < 0) || (c >= MOD_CHARACTERS) || !s_skin[c].hasModel)
+	{
+		return;
+	}
+
+	DecalFont_DrawLine((char *)s_modSkinHint[NativeMods_Lang()], 0x100, 0xcc, FONT_SMALL, (JUSTIFY_CENTER | ORANGE));
+
+	if (sdata->buttonTapPerPlayer[0] & BTN_SELECT)
+	{
+		s_skinOn[c] = !s_skinOn[c];
+		NativeMods_SkinApplyIcon(c);
+		NativeMods_SkinApplyName(c);
+		NativeMods_SkinSaveChoices();
+		OtherFX_Play(1, 1);
+	}
+}
+
 /* -------------------------------------------------------------------- hooks --- */
 
 void NativeMods_Frame(void)
@@ -1021,6 +1337,16 @@ void NativeMods_OnVramLoaded(void)
 	if (g_modKartTextures)
 	{
 		NativeMods_LoadKartTextures();
+	}
+
+	/* skins: the shared VRAM upload put the retail icons back */
+	NativeMods_SkinInit();
+	for (s32 c = 0; c < 16; c++)
+	{
+		if (s_skinOn[c])
+		{
+			NativeMods_SkinApplyIcon(c);
+		}
 	}
 	if (g_modPaintJobs)
 	{

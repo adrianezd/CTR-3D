@@ -21,9 +21,13 @@
 #if CTR_NATIVE_MEMPACK_RETAIL_PRESSURE
 // NOTE(aalhendi): Retail pressure mode exposes the NTSC-U 926 mempack window
 // inside a 2 MiB backing store.
+// The window used to start at 0xba9f0 (where retail's executable ends) and the bytes below it
+// stayed unused: native code lives outside this buffer. It now starts at 0x10000 and ends where
+// retail's did (0x1ff800), so the PSX-shaped 2 MiB window and every end-relative conversion are
+// unchanged while MEMPACK gains ~680 KB -- room the community mods' extra driver models need.
 #define CTR_NATIVE_MEMPACK_BUFFER_SIZE  0x200000u
-#define CTR_NATIVE_MEMPACK_START_OFFSET 0xba9f0u
-#define CTR_NATIVE_MEMPACK_SIZE         0x144e10u
+#define CTR_NATIVE_MEMPACK_START_OFFSET 0x10000u
+#define CTR_NATIVE_MEMPACK_SIZE         0x1ef800u
 #else
 #define CTR_NATIVE_MEMPACK_BUFFER_SIZE  (8u * 1024u * 1024u)
 #define CTR_NATIVE_MEMPACK_START_OFFSET 0u
