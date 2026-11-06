@@ -454,6 +454,10 @@ void LOAD_VramFileCallback(struct LoadQueueSlot *lqs)
 		}
 	}
 
+#ifdef CTR_NATIVE
+	NativeMods_OnVramLoaded();
+#endif
+
 	// LOAD_NextQueuedFile waits 3 vsync frames before releasing the queue.
 	sdata->frameFinishedVRAM = sdata->gGT->frameTimer_VsyncCallback;
 }

@@ -39,4 +39,6 @@ static inline void *CTR_PsyqMemmove(void *dest, const void *src, s32 count)
 #define memmove(dest, src, count) CTR_PsyqMemmove((dest), (src), (s32)(count))
 #endif
 
+#include <native_mods.h>
+
 #endif

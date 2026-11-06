@@ -549,6 +549,16 @@ struct Model *VehBirth_GetModelByName(char *searchName)
 		}
 	}
 
+#ifdef CTR_NATIVE
+	{
+		struct Model *rival = NativeMods_FindRivalModel(searchName);
+		if (rival != NULL)
+		{
+			return rival;
+		}
+	}
+#endif
+
 	struct Model **models = (struct Model **)sdata->PLYROBJECTLIST;
 
 	if (
@@ -609,7 +619,7 @@ void VehBirth_SetConsts(struct Driver *driver)
 	}
 
 #ifdef CTR_NATIVE
-	if (g_pentaPal && (data.characterIDs[driver->driverID] == PENTA_PENGUIN))
+	if (NativeMods_WantsUnlimitedClass(data.characterIDs[driver->driverID]))
 	{
 		NativePenta_ApplyPalClass(driver);
 	}

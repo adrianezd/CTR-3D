@@ -382,6 +382,9 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		{
 			data.driverModelExtras[i].fileBase = NULL;
 		}
+#ifdef CTR_NATIVE
+		NativeMods_ClearRivalModels();
+#endif
 
 		// NOTE(aalhendi): Retail gates stage advancement until the driver MPK callback sets ptrMPK.
 		sdata->load_inProgress = 1;
@@ -470,6 +473,9 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 				data.driverModelExtras[i].model = (struct Model *)((u8 *)data.driverModelExtras[i].fileBase + LOAD_MODEL_FILE_HEADER_BYTES);
 			}
 		}
+#ifdef CTR_NATIVE
+		NativeMods_ResolveRivalModels();
+#endif
 
 		// == banks are done parsing ===
 

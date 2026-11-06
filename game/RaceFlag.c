@@ -1084,7 +1084,7 @@ SKIP_LOADING_TEXT:
 					 * pattern. Lighting, mesh, wave and geometry are identical
 					 * to retail's -- only the colour written into the same two
 					 * gouraud corners differs. */
-					if (g_dbg_flagStyle == 1)
+					if (NativeMods_FlagStyle(g_dbg_flagStyle) == 1)
 					{
 						const u8 *tint = s_rfStripeRGB[RaceFlag_StripeIndex(i, flagWide)];
 						/* Lighting with the LIGHT-tile curve for every stripe:
@@ -1101,7 +1101,23 @@ SKIP_LOADING_TEXT:
 						setRGB1(p, (u8)((lumL * tint[0]) >> 8), (u8)((lumL * tint[1]) >> 8), (u8)((lumL * tint[2]) >> 8));
 						CTR_WriteU32LE(&p->r3, CTR_ReadU32LE(&p->r1));
 					}
-					else if (g_dbg_flagStyle == 2)
+					else if (NativeMods_FlagStyle(g_dbg_flagStyle) == 3)
+					{
+						/* CustomFlag (CTR-ModSDK): blue checkers, Nitro-Fueled colours. Retail's two
+						 * brightness curves, each tile tinted by its own colour. */
+						static const u8 s_rfBlueLight[3] = {0x42, 0xAA, 0xD7};
+						static const u8 s_rfBlueDark[3] = {0x3F, 0x96, 0xCD};
+						const u8 boolDark = (((((u32)column / RACE_FLAG_CHECKER_QUADS) + ((u32)i / RACE_FLAG_CHECKER_QUADS)) & 1U) != 0);
+						const u8 *tint = boolDark ? s_rfBlueDark : s_rfBlueLight;
+						u8 lumR = RaceFlag_CalculateBrightness(lightR, boolDark);
+						u8 lumL = RaceFlag_CalculateBrightness(lightL, boolDark);
+
+						setRGB0(p, (u8)((lumR * tint[0]) >> 8), (u8)((lumR * tint[1]) >> 8), (u8)((lumR * tint[2]) >> 8));
+						setRGB1(p, (u8)((lumL * tint[0]) >> 8), (u8)((lumL * tint[1]) >> 8), (u8)((lumL * tint[2]) >> 8));
+						CTR_WriteU32LE(&p->r2, CTR_ReadU32LE(&p->r0));
+						CTR_WriteU32LE(&p->r3, CTR_ReadU32LE(&p->r1));
+					}
+					else if (NativeMods_FlagStyle(g_dbg_flagStyle) == 2)
 					{
 						/* Purple/white checkers -- the SOAR/Spyro egg. Exactly
 						 * retail's checker pattern and wave lighting; the only

@@ -34,6 +34,7 @@ struct NativeOptToggle
 	s16 lngSlot;
 	int *flag;
 	void (*applyFn)(void); /* extra work a flip needs beyond the flag write */
+	s16 textIndex;         /* index into NativeOptText.toggleName */
 };
 
 /* Row order here is the order of NativeOptText.toggleName below. The visible text of every row
@@ -46,12 +47,19 @@ struct NativeOptToggle
  * labels short enough (small font) that the box clears the screen edge at the main menu's
  * right-of-center anchor: 18 characters is the widest row that is known to fit. */
 static struct NativeOptToggle s_optToggles[] = {
-    {LNG_UNUSED_0E5, &g_pentaPal, NULL},
-    {LNG_UNUSED_0E6, &g_reservesMeter, NULL},
-    {LNG_UNUSED_0E7, &g_dbg_btmMap, NULL},
+    {LNG_UNUSED_0E5, &g_pentaPal, NULL, 0},
+    {LNG_UNUSED_0E6, &g_reservesMeter, NULL, 1},
+    {LNG_UNUSED_0E7, &g_dbg_btmMap, NULL, 2},
 #if defined(CTR_NATIVE_TRACK_RENDERER) && CTR_NATIVE_TRACK_RENDERER
-    {LNG_UNUSED_0E8, &g_dbg_trackBilinear, N3DS_TrackAtlas_ApplyFilter},
+    {LNG_UNUSED_0E8, &g_dbg_trackBilinear, N3DS_TrackAtlas_ApplyFilter, 3},
 #endif
+    /* community mods, platform/native_mods.c */
+    {LNG_UNUSED_0EF, &g_modEngineSelect, NULL, 4},
+    {LNG_UNUSED_0F0, &g_modRandomRivals, NULL, 5},
+    {LNG_UNUSED_0F1, &g_modBlueFire, NULL, 6},
+    {LNG_UNUSED_0F2, &g_modBlueFlag, NULL, 7},
+    {LNG_UNUSED_0F4, &g_modPaintJobs, NULL, 8},
+    {LNG_UNUSED_0F5, &g_modKartTextures, NULL, 9},
 };
 #define OPT_TOGGLE_COUNT ((s32)(sizeof(s_optToggles) / sizeof(s_optToggles[0])))
 
@@ -79,7 +87,7 @@ static const s16 s_optLangFile[OPT_LANG_COUNT] = {1, 3, 4, 5, 6, 7};
  * them here. Language names are written in their own language everywhere else (so you can still
  * find your language in a menu you cannot read), which is why these rows also fit in 18.
  */
-#define OPT_TEXT_TOGGLES 4
+#define OPT_TEXT_TOGGLES 10
 
 struct NativeOptText
 {
@@ -95,7 +103,7 @@ struct NativeOptText
 static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
     /* English (NTSC-U file 1): unchanged */
     {"OPTIONS",
-     {"PAL PENTA", "RESERVES METER", "BOTTOM MAP", "TEXTURE FILTER"},
+     {"PAL PENTA", "RESERVES METER", "BOTTOM MAP", "TEXTURE FILTER", "ENGINE SELECT", "RANDOM RIVALS", "BLUE FIRE", "BLUE FLAG", "PAINT JOBS", "KART TEXTURES"},
      "OFF",
      "ON",
      "LANGUAGE",
@@ -103,7 +111,7 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      9},
     /* French */
     {"OPTIONS",
-     {"PENTA PAL", "JAUGE RESERVE", "CARTE EN BAS", "FILTRE TEXTURE"},
+     {"PENTA PAL", "JAUGE RESERVE", "CARTE EN BAS", "FILTRE TEXTURE", "CHOIX MOTEUR", "RIVAUX HASARD", "FEU BLEU", "DRAPEAU BLEU", "PEINTURES", "TEXTURES KART"},
      "NON",
      "OUI",
      "LANGUE",
@@ -111,7 +119,7 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10},
     /* German */
     {"OPTIONEN",
-     {"PAL PENTA", "RESERVEANZEIGE", "KARTE UNTEN", "TEXTURFILTER"},
+     {"PAL PENTA", "RESERVEANZEIGE", "KARTE UNTEN", "TEXTURFILTER", "MOTORWAHL", "ZUFALLSGEGNER", "BLAUES FEUER", "BLAUE FLAGGE", "LACKIERUNGEN", "KARTTEXTUREN"},
      "AUS",
      "EIN",
      "SPRACHE",
@@ -119,7 +127,7 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10},
     /* Italian */
     {"OPZIONI",
-     {"PENTA PAL", "BARRA RISERVA", "MAPPA IN BASSO", "FILTRO TEXTURE"},
+     {"PENTA PAL", "BARRA RISERVA", "MAPPA IN BASSO", "FILTRO TEXTURE", "SCELTA MOTORE", "RIVALI CASUALI", "FUOCO BLU", "BANDIERA BLU", "VERNICI", "TEXTURE KART"},
      "NO",
      "SI",
      "LINGUA",
@@ -127,7 +135,7 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10},
     /* Spanish */
     {"OPCIONES",
-     {"PENTA PAL", "MEDIDOR RESERVA", "MAPA INFERIOR", "FILTRO TEXTURAS"},
+     {"PENTA PAL", "MEDIDOR RESERVA", "MAPA INFERIOR", "FILTRO TEXTURAS", "ELEGIR MOTOR", "RIVALES AZAR", "FUEGO AZUL", "BANDERA AZUL", "PINTURAS", "TEXTURAS KART"},
      "NO",
      "SI",
      "IDIOMA",
@@ -135,7 +143,7 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10},
     /* Dutch */
     {"OPTIES",
-     {"PAL PENTA", "RESERVEMETER", "KAART ONDER", "TEXTUURFILTER"},
+     {"PAL PENTA", "RESERVEMETER", "KAART ONDER", "TEXTUURFILTER", "MOTORKEUZE", "RANDOM RIVALEN", "BLAUW VUUR", "BLAUWE VLAG", "LAKKEN", "KARTTEXTUREN"},
      "UIT",
      "AAN",
      "TAAL",
@@ -274,22 +282,25 @@ static void NativeOptions_CycleLanguage(void)
 	NativeOptions_SaveLanguage();
 }
 
-/* Nav targets must mirror s_optToggles row for row; the terminator is not a
- * valid nav target, so the last real row's down points at itself. */
-static struct MenuRow s_optMenuRows[] = {
-    {LNG_UNUSED_0E5, 0, 1, 0, 0},
-#if defined(CTR_NATIVE_TRACK_RENDERER) && CTR_NATIVE_TRACK_RENDERER
-    {LNG_UNUSED_0E6, 0, 2, 1, 1},
-    {LNG_UNUSED_0E7, 1, 3, 2, 2},
-    {LNG_UNUSED_0E8, 2, 4, 3, 3},
-    {LNG_UNUSED_0E9, 3, 4, 4, 4}, /* language selector = row OPT_TOGGLE_COUNT */
-#else
-    {LNG_UNUSED_0E6, 0, 2, 1, 1},
-    {LNG_UNUSED_0E7, 1, 3, 2, 2},
-    {LNG_UNUSED_0E9, 2, 3, 3, 3}, /* language selector = row OPT_TOGGLE_COUNT */
-#endif
-    {RECTMENU_STRING_NONE, 0, 0, 0, 0},
-};
+/* One row per toggle, then the language selector (row OPT_TOGGLE_COUNT), then the terminator.
+ * Built from s_optToggles by NativeOptions_BuildRows; the terminator is not a valid nav target,
+ * so the last real row's down points at itself. */
+static struct MenuRow s_optMenuRows[OPT_TOGGLE_COUNT + 2];
+
+static void NativeOptions_BuildRows(void)
+{
+	const s32 last = OPT_TOGGLE_COUNT;
+
+	for (s32 i = 0; i <= last; i++)
+	{
+		s_optMenuRows[i].stringIndex = (i < last) ? s_optToggles[i].lngSlot : LNG_UNUSED_0E9;
+		s_optMenuRows[i].rowOnPressUp = (char)((i > 0) ? (i - 1) : 0);
+		s_optMenuRows[i].rowOnPressDown = (char)((i < last) ? (i + 1) : last);
+		s_optMenuRows[i].rowOnPressLeft = (char)i;
+		s_optMenuRows[i].rowOnPressRight = (char)i;
+	}
+	s_optMenuRows[last + 1] = (struct MenuRow){RECTMENU_STRING_NONE, 0, 0, 0, 0};
+}
 
 static void NativeOptions_RefreshLabels(void)
 {
@@ -297,7 +308,7 @@ static void NativeOptions_RefreshLabels(void)
 	s32 stateWidth = NativeOptions_VisibleLen(text->stateOff);
 
 	/* every slot written below must exist in the loaded language's string table */
-	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0E9))
+	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0F5))
 	{
 		return;
 	}
@@ -309,7 +320,8 @@ static void NativeOptions_RefreshLabels(void)
 
 	for (s32 i = 0; i < OPT_TOGGLE_COUNT; i++)
 	{
-		NativeOptions_Compose(s_optLabelBuf[i], OPT_LABEL_MAX, text->toggleName[i], *s_optToggles[i].flag ? text->stateOn : text->stateOff, stateWidth);
+		NativeOptions_Compose(s_optLabelBuf[i], OPT_LABEL_MAX, text->toggleName[s_optToggles[i].textIndex], *s_optToggles[i].flag ? text->stateOn : text->stateOff,
+		                      stateWidth);
 		sdata->lngStrings[s_optToggles[i].lngSlot] = s_optLabelBuf[i];
 	}
 
@@ -421,14 +433,26 @@ s32 NativeOptions_HandleMainMenuChoice(struct RectMenu *mainMenu, s32 choose)
 
 void NativeOptions_InstallStrings(void)
 {
+	NativeMods_InstallStrings();
+
 #ifdef __3DS__
-	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0E9))
+	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0F5))
 	{
 		return;
 	}
 
+	NativeOptions_BuildRows();
 	sdata->lngStrings[LNG_UNUSED_0E4] = (char *)s_optText[s_optLangIndex].title;
 	NativeOptions_RefreshLabels();
+#endif
+}
+
+s32 NativeOptions_LanguageIndex(void)
+{
+#ifdef __3DS__
+	return s_optLangIndex;
+#else
+	return 0;
 #endif
 }
 

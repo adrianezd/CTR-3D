@@ -431,6 +431,9 @@ void MM_ToggleRows_Difficulty(void)
 		// save new value
 		D230.rowsDifficulty[difficultyIndex].stringIndex = lngIndex;
 	}
+#ifdef CTR_NATIVE
+	NativeMods_SyncDifficultyRows();
+#endif
 }
 
 // NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 230 0x800ad7a4-0x800ad828.
@@ -446,11 +449,18 @@ void MM_MenuProc_Difficulty(struct RectMenu *menu)
 
 	else
 	{
-		// if you are on a valid row
+		// if you are on a valid row (rows 3-4: ExtraDifficulty's SUPER HARD and ULTRA HARD)
+#ifdef CTR_NATIVE
+		if (NativeMods_DifficultyChoice(row) || ((row >= 0) && (row < MM_DIFFICULTY_COUNT)))
+#else
 		if ((row >= 0) && (row < MM_DIFFICULTY_COUNT))
+#endif
 		{
 			// set difficulty to value, from array of fixed difficulty values
-			sdata->gGT->arcadeDifficulty = D230.cupDifficulty.speed[row];
+			if (row < MM_DIFFICULTY_COUNT)
+			{
+				sdata->gGT->arcadeDifficulty = D230.cupDifficulty.speed[row];
+			}
 
 			D230.titleMenuState = TITLE_MENU_STATE_EXITING;
 			D230.desiredMenuIndex = MM_EXIT_ROUTE_CHARACTER_SELECT;

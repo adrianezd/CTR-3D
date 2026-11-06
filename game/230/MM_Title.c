@@ -257,6 +257,9 @@ END_FUNCTION:
 	D230.menuPlayers2P3P4P.posY_curr = D230.titlePlayersMenuPos.y + D230.titlePlayersTransition.currY;
 	D230.menuDifficulty.posX_curr = D230.titleDifficultyMenuPos.x + D230.titleDifficultyTransition.currX;
 	D230.menuDifficulty.posY_curr = D230.titleDifficultyMenuPos.y + D230.titleDifficultyTransition.currY;
+#ifdef CTR_NATIVE
+	NativeMods_SyncDifficultyRows();
+#endif
 }
 
 // NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 230 0x800ac94c-0x800ac9fc.

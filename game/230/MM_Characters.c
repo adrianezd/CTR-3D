@@ -675,6 +675,9 @@ void MM_Characters_RestoreIDs(void)
 
 	// erase select bits
 	sdata->characterSelectFlags = 0;
+#ifdef CTR_NATIVE
+	NativeMods_CharacterSelectEnter();
+#endif
 	D230.characterSelectTransitionFrame = MM_CHARACTER_SELECT_TRANSITION_FRAMES;
 	D230.characterSelectMenuState = ENTERING_MENU;
 
@@ -1087,6 +1090,14 @@ dontDrawSelectCharacter:
 					// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800aefa4-0x800aefe4 for character confirm SFX.
 					OtherFX_Play(1, 1);
 
+#ifdef CTR_NATIVE
+					// EngineSelect: the class is picked next, a second confirm moves on
+					if (NativeMods_EngineSelectActive())
+					{
+						NativeMods_EngineSelectBegin(playerIndex, D230.activeCharacterSelectMeta[(s16)currentIcon].characterID);
+					}
+					else
+#endif
 					// if all players have selected their characters
 					if ((int)(s16)sdata->characterSelectFlags == (1 << numPlyrNextGame) - 1)
 					{
@@ -1114,6 +1125,23 @@ dontDrawSelectCharacter:
 			}
 			else
 			{
+#ifdef CTR_NATIVE
+				if (NativeMods_EngineSelectActive())
+				{
+					s32 selectedCharacter = D230.activeCharacterSelectMeta[(s16)currentIcon].characterID;
+
+					if (((button & MM_CHARACTER_SELECT_INPUT_BACK) != 0) && NativeMods_EngineSelectBack(playerIndex))
+					{
+						button = 0;
+					}
+					else if (NativeMods_EngineSelectInput(playerIndex, selectedCharacter, button, gGT->numPlyrNextGame, sdata->characterSelectFlags))
+					{
+						// exit toward cup or track selection
+						D230.characterSelectExitsForward = 1;
+						D230.characterSelectMenuState = EXITING_MENU;
+					}
+				}
+#endif
 				// if you press Square or Triangle
 				if ((button & MM_CHARACTER_SELECT_INPUT_BACK) != 0)
 				{
@@ -1158,6 +1186,10 @@ dontDrawSelectCharacter:
 
 		RECTMENU_DrawOuterRect_HighLevel(&drawRect, outlineColor, 0, ot);
 	}
+
+#ifdef CTR_NATIVE
+	NativeMods_CharacterMenuFrame();
+#endif
 
 	MM_Characters_PreventOverlap();
 
@@ -1273,6 +1305,16 @@ dontDrawSelectCharacter:
 				nameY = nameBaseY + D230.characterSelectNameTextY + nameYOffset;
 			}
 
+			// EngineSelect: a selected player's window shows the engine class instead of the name
+#ifdef CTR_NATIVE
+			if (NativeMods_EngineSelectActive() && playerSelected)
+			{
+				NativeMods_EngineSelectDrawName(playerIndex, activeCharacterSelectMeta->characterID,
+				                                (int)driverWindowTransition->currX + windowPos->x + (int)((u32)D230.characterSelectWindowWidth >> 1), (int)nameY,
+				                                (s32)fontType, numPlyrNextGame);
+			}
+			else
+#endif
 			// draw string
 			DecalFont_DrawLine(sdata->lngStrings[data.MetaDataCharacters[activeCharacterSelectMeta->characterID].name_LNG_long],
 			                   (int)driverWindowTransition->currX + windowPos->x + (int)((u32)D230.characterSelectWindowWidth >> 1), (int)nameY, fontType,

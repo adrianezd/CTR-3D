@@ -65,6 +65,13 @@ void LOAD_Robots1P(int characterID)
 {
 	int newCharacterID = 0;
 
+#ifdef CTR_NATIVE
+	if (NativeMods_RandomizeRivals(characterID))
+	{
+		return;
+	}
+#endif
+
 	data.characterIDs[0] = characterID;
 
 	for (int i = 1; i < LOAD_CHARACTER_ID_COUNT; i++, newCharacterID++)
@@ -154,6 +161,13 @@ int LOAD_DriverMPK(struct BigHeader *bigfile, int levelLOD, void (*callback)(str
 		if ((gameMode1 & (TIME_TRIAL | MAIN_MENU)) != MAIN_MENU)
 		{
 			LOAD_Robots1P(data.characterIDs[0]);
+
+#ifdef CTR_NATIVE
+			if (NativeMods_QueueRivalModels(bigfile, callback))
+			{
+				return sdata->ptrMPK;
+			}
+#endif
 		}
 
 		// arcade mpk

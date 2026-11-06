@@ -22,6 +22,10 @@ void LOAD_GlobalModelPtrs_MPK()
 		gGT->modelPtr[m->id] = m;
 	}
 
+#ifdef CTR_NATIVE
+	NativeMods_StoreRivalModelPtrs(gGT);
+#endif
+
 	if (sdata->PLYROBJECTLIST != 0)
 	{
 		LibraryOfModels_Store(gGT, -1, (struct Model **)sdata->PLYROBJECTLIST);

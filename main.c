@@ -140,6 +140,7 @@
 #include "platform/native_state.c"
 #include "platform/native_str.c"
 #include "platform/native_options.c"
+#include "platform/native_mods.c"
 
 #ifndef CC
 #if __GNUC__

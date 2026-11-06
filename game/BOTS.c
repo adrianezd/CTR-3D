@@ -450,6 +450,10 @@ void BOTS_UpdateGlobals(void)
 {
 	struct GameTracker *gGT = sdata->gGT;
 
+#ifdef CTR_NATIVE
+	NativeMods_Frame();
+#endif
+
 	if (gGT->numBotsNextGame != 0)
 	{
 		EngineSound_NearestAIs();
