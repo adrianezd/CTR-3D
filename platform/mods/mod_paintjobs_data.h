@@ -694,27 +694,27 @@ static const Texture PAINT21[]  = {
 /* character-select CLUT positions -- from CTR-ModSDK mods/Modules/PaintJobs_OnlyUSA/src/paints/PAINTP_M.c (GPL-3.0) */
 // CLUT pos
 
-static const RECT front_crash_menu_pos  = {
+static const RECT16 front_crash_menu_pos  = {
 	.x = 784,
 	.y = 510,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_crash_menu_pos  = {
+static const RECT16 back_crash_menu_pos  = {
 	.x = 784,
 	.y = 507,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_crash_menu_pos  = {
+static const RECT16 brown_crash_menu_pos  = {
 	.x = 592,
 	.y = 227,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_crash_menu_pos  = {
+static const RECT16 motortop_crash_menu_pos  = {
 	.x = 784,
 	.y = 505,
 	.w = 16,
@@ -722,703 +722,703 @@ static const RECT motortop_crash_menu_pos  = {
 };
 
 
-static const RECT floor_crash_menu_pos  = {
+static const RECT16 floor_crash_menu_pos  = {
 	.x = 624,
 	.y = 220,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_crash_menu_pos  = {
+static const RECT16 motorside_crash_menu_pos  = {
 	.x = 784,
 	.y = 506,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_crash_menu_pos  = {
+static const RECT16 bridge_crash_menu_pos  = {
 	.x = 592,
 	.y = 502,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_crash_menu_pos  = {
+static const RECT16 exhaust_crash_menu_pos  = {
 	.x = 592,
 	.y = 503,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_pura_menu_pos  = {
+static const RECT16 brown_pura_menu_pos  = {
 	.x = 592,
 	.y = 220,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_polar_menu_pos  = {
+static const RECT16 brown_polar_menu_pos  = {
 	.x = 592,
 	.y = 221,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_dingo_menu_pos  = {
+static const RECT16 brown_dingo_menu_pos  = {
 	.x = 592,
 	.y = 222,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_ngin_menu_pos  = {
+static const RECT16 brown_ngin_menu_pos  = {
 	.x = 592,
 	.y = 223,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_coco_menu_pos  = {
+static const RECT16 brown_coco_menu_pos  = {
 	.x = 592,
 	.y = 224,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_tiny_menu_pos  = {
+static const RECT16 brown_tiny_menu_pos  = {
 	.x = 592,
 	.y = 225,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_cortex_menu_pos  = {
+static const RECT16 brown_cortex_menu_pos  = {
 	.x = 592,
 	.y = 226,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_fakecrash_menu_pos  = {
+static const RECT16 brown_fakecrash_menu_pos  = {
 	.x = 608,
 	.y = 221,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_penta_menu_pos  = {
+static const RECT16 brown_penta_menu_pos  = {
 	.x = 608,
 	.y = 224,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_tropy_menu_pos  = {
+static const RECT16 brown_tropy_menu_pos  = {
 	.x = 608,
 	.y = 225,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_joe_menu_pos  = {
+static const RECT16 brown_joe_menu_pos  = {
 	.x = 608,
 	.y = 226,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_roo_menu_pos  = {
+static const RECT16 brown_roo_menu_pos  = {
 	.x = 608,
 	.y = 227,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_papu_menu_pos  = {
+static const RECT16 brown_papu_menu_pos  = {
 	.x = 608,
 	.y = 228,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_pinstripe_menu_pos  = {
+static const RECT16 brown_pinstripe_menu_pos  = {
 	.x = 608,
 	.y = 230,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_fakecrash_menu_pos  = {
+static const RECT16 motortop_fakecrash_menu_pos  = {
 	.x = 768,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_cortex_menu_pos  = {
+static const RECT16 motortop_cortex_menu_pos  = {
 	.x = 768,
 	.y = 508,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_penta_menu_pos  = {
+static const RECT16 motortop_penta_menu_pos  = {
 	.x = 784,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_tropy_menu_pos  = {
+static const RECT16 motortop_tropy_menu_pos  = {
 	.x = 800,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_joe_menu_pos  = {
+static const RECT16 motortop_joe_menu_pos  = {
 	.x = 800,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_roo_menu_pos  = {
+static const RECT16 motortop_roo_menu_pos  = {
 	.x = 816,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_papu_menu_pos  = {
+static const RECT16 motortop_papu_menu_pos  = {
 	.x = 832,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_pinstripe_menu_pos  = {
+static const RECT16 motortop_pinstripe_menu_pos  = {
 	.x = 832,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_pura_menu_pos  = {
+static const RECT16 motortop_pura_menu_pos  = {
 	.x = 848,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_polar_menu_pos  = {
+static const RECT16 motortop_polar_menu_pos  = {
 	.x = 848,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_dingo_menu_pos  = {
+static const RECT16 motortop_dingo_menu_pos  = {
 	.x = 864,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_ngin_menu_pos  = {
+static const RECT16 motortop_ngin_menu_pos  = {
 	.x = 864,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_coco_menu_pos  = {
+static const RECT16 motortop_coco_menu_pos  = {
 	.x = 880,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_tiny_menu_pos  = {
+static const RECT16 motortop_tiny_menu_pos  = {
 	.x = 880,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_cortex_menu_pos  = {
+static const RECT16 floor_cortex_menu_pos  = {
 	.x = 624,
 	.y = 219,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_fakecrash_menu_pos  = {
+static const RECT16 floor_fakecrash_menu_pos  = {
 	.x = 624,
 	.y = 505,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_penta_menu_pos  = {
+static const RECT16 floor_penta_menu_pos  = {
 	.x = 624,
 	.y = 506,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_tropy_menu_pos  = {
+static const RECT16 floor_tropy_menu_pos  = {
 	.x = 624,
 	.y = 507,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_joe_menu_pos  = {
+static const RECT16 floor_joe_menu_pos  = {
 	.x = 624,
 	.y = 510,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_roo_menu_pos  = {
+static const RECT16 floor_roo_menu_pos  = {
 	.x = 624,
 	.y = 511,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_pinstripe_menu_pos  = {
+static const RECT16 floor_pinstripe_menu_pos  = {
 	.x = 944,
 	.y = 498,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_pura_menu_pos  = {
+static const RECT16 floor_pura_menu_pos  = {
 	.x = 944,
 	.y = 499,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_polar_menu_pos  = {
+static const RECT16 floor_polar_menu_pos  = {
 	.x = 944,
 	.y = 500,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_dingo_menu_pos  = {
+static const RECT16 floor_dingo_menu_pos  = {
 	.x = 944,
 	.y = 501,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_ngin_menu_pos  = {
+static const RECT16 floor_ngin_menu_pos  = {
 	.x = 944,
 	.y = 503,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_coco_menu_pos  = {
+static const RECT16 floor_coco_menu_pos  = {
 	.x = 944,
 	.y = 505,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_tiny_menu_pos  = {
+static const RECT16 floor_tiny_menu_pos  = {
 	.x = 944,
 	.y = 506,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_tiny_menu_pos  = {
+static const RECT16 motorside_tiny_menu_pos  = {
 	.x = 768,
 	.y = 504,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_cortex_menu_pos  = {
+static const RECT16 motorside_cortex_menu_pos  = {
 	.x = 768,
 	.y = 509,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_fakecrash_menu_pos  = {
+static const RECT16 motorside_fakecrash_menu_pos  = {
 	.x = 784,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_penta_menu_pos  = {
+static const RECT16 motorside_penta_menu_pos  = {
 	.x = 800,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_tropy_menu_pos  = {
+static const RECT16 motorside_tropy_menu_pos  = {
 	.x = 800,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_joe_menu_pos  = {
+static const RECT16 motorside_joe_menu_pos  = {
 	.x = 800,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_roo_menu_pos  = {
+static const RECT16 motorside_roo_menu_pos  = {
 	.x = 816,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_papu_menu_pos  = {
+static const RECT16 motorside_papu_menu_pos  = {
 	.x = 816,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_pinstripe_menu_pos  = {
+static const RECT16 motorside_pinstripe_menu_pos  = {
 	.x = 832,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_pura_menu_pos  = {
+static const RECT16 motorside_pura_menu_pos  = {
 	.x = 832,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_polar_menu_pos  = {
+static const RECT16 motorside_polar_menu_pos  = {
 	.x = 848,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_dingo_menu_pos  = {
+static const RECT16 motorside_dingo_menu_pos  = {
 	.x = 864,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_ngin_menu_pos  = {
+static const RECT16 motorside_ngin_menu_pos  = {
 	.x = 864,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_coco_menu_pos  = {
+static const RECT16 motorside_coco_menu_pos  = {
 	.x = 880,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_fakecrash_menu_pos  = {
+static const RECT16 front_fakecrash_menu_pos  = {
 	.x = 768,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_cortex_menu_pos  = {
+static const RECT16 front_cortex_menu_pos  = {
 	.x = 768,
 	.y = 510,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_penta_menu_pos  = {
+static const RECT16 front_penta_menu_pos  = {
 	.x = 784,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_tropy_menu_pos  = {
+static const RECT16 front_tropy_menu_pos  = {
 	.x = 800,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_joe_menu_pos  = {
+static const RECT16 front_joe_menu_pos  = {
 	.x = 800,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_roo_menu_pos  = {
+static const RECT16 front_roo_menu_pos  = {
 	.x = 816,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_papu_menu_pos  = {
+static const RECT16 front_papu_menu_pos  = {
 	.x = 816,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_pinstripe_menu_pos  = {
+static const RECT16 front_pinstripe_menu_pos  = {
 	.x = 832,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_pura_menu_pos  = {
+static const RECT16 front_pura_menu_pos  = {
 	.x = 848,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_polar_menu_pos  = {
+static const RECT16 front_polar_menu_pos  = {
 	.x = 848,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_dingo_menu_pos  = {
+static const RECT16 front_dingo_menu_pos  = {
 	.x = 848,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_ngin_menu_pos  = {
+static const RECT16 front_ngin_menu_pos  = {
 	.x = 864,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_coco_menu_pos  = {
+static const RECT16 front_coco_menu_pos  = {
 	.x = 880,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_tiny_menu_pos  = {
+static const RECT16 front_tiny_menu_pos  = {
 	.x = 880,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_fakecrash_menu_pos  = {
+static const RECT16 back_fakecrash_menu_pos  = {
 	.x = 768,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_cortex_menu_pos  = {
+static const RECT16 back_cortex_menu_pos  = {
 	.x = 768,
 	.y = 511,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_penta_menu_pos  = {
+static const RECT16 back_penta_menu_pos  = {
 	.x = 784,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_tropy_menu_pos  = {
+static const RECT16 back_tropy_menu_pos  = {
 	.x = 800,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_joe_menu_pos  = {
+static const RECT16 back_joe_menu_pos  = {
 	.x = 816,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_roo_menu_pos  = {
+static const RECT16 back_roo_menu_pos  = {
 	.x = 816,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_papu_menu_pos  = {
+static const RECT16 back_papu_menu_pos  = {
 	.x = 816,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_pinstripe_menu_pos  = {
+static const RECT16 back_pinstripe_menu_pos  = {
 	.x = 832,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_pura_menu_pos  = {
+static const RECT16 back_pura_menu_pos  = {
 	.x = 832,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_polar_menu_pos  = {
+static const RECT16 back_polar_menu_pos  = {
 	.x = 848,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_dingo_menu_pos  = {
+static const RECT16 back_dingo_menu_pos  = {
 	.x = 848,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_ngin_menu_pos  = {
+static const RECT16 back_ngin_menu_pos  = {
 	.x = 864,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_coco_menu_pos  = {
+static const RECT16 back_coco_menu_pos  = {
 	.x = 880,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_tiny_menu_pos  = {
+static const RECT16 back_tiny_menu_pos  = {
 	.x = 880,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_cortex_menu_pos  = {
+static const RECT16 bridge_cortex_menu_pos  = {
 	.x = 576,
 	.y = 507,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_polar_menu_pos  = {
+static const RECT16 bridge_polar_menu_pos  = {
 	.x = 704,
 	.y = 510,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_dingo_menu_pos  = {
+static const RECT16 bridge_dingo_menu_pos  = {
 	.x = 720,
 	.y = 506,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_ngin_menu_pos  = {
+static const RECT16 bridge_ngin_menu_pos  = {
 	.x = 736,
 	.y = 505,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_coco_menu_pos  = {
+static const RECT16 bridge_coco_menu_pos  = {
 	.x = 752,
 	.y = 506,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_tiny_menu_pos  = {
+static const RECT16 bridge_tiny_menu_pos  = {
 	.x = 752,
 	.y = 509,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_fakecrash_menu_pos  = {
+static const RECT16 bridge_fakecrash_menu_pos  = {
 	.x = 816,
 	.y = 506,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_penta_menu_pos  = {
+static const RECT16 bridge_penta_menu_pos  = {
 	.x = 832,
 	.y = 504,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_tropy_menu_pos  = {
+static const RECT16 bridge_tropy_menu_pos  = {
 	.x = 832,
 	.y = 508,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_joe_menu_pos  = {
+static const RECT16 bridge_joe_menu_pos  = {
 	.x = 848,
 	.y = 508,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_roo_menu_pos  = {
+static const RECT16 bridge_roo_menu_pos  = {
 	.x = 864,
 	.y = 504,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_papu_menu_pos  = {
+static const RECT16 bridge_papu_menu_pos  = {
 	.x = 864,
 	.y = 507,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_pinstripe_menu_pos  = {
+static const RECT16 bridge_pinstripe_menu_pos  = {
 	.x = 880,
 	.y = 505,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_pura_menu_pos  = {
+static const RECT16 bridge_pura_menu_pos  = {
 	.x = 880,
 	.y = 509,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_cortex_menu_pos  = {
+static const RECT16 exhaust_cortex_menu_pos  = {
 	.x = 576,
 	.y = 508,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_polar_menu_pos  = {
+static const RECT16 exhaust_polar_menu_pos  = {
 	.x = 704,
 	.y = 509,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_dingo_menu_pos  = {
+static const RECT16 exhaust_dingo_menu_pos  = {
 	.x = 720,
 	.y = 507,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_ngin_menu_pos  = {
+static const RECT16 exhaust_ngin_menu_pos  = {
 	.x = 736,
 	.y = 506,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_coco_menu_pos  = {
+static const RECT16 exhaust_coco_menu_pos  = {
 	.x = 752,
 	.y = 507,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_tiny_menu_pos  = {
+static const RECT16 exhaust_tiny_menu_pos  = {
 	.x = 752,
 	.y = 510,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_fakecrash_menu_pos  = {
+static const RECT16 exhaust_fakecrash_menu_pos  = {
 	.x = 816,
 	.y = 511,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_penta_menu_pos  = {
+static const RECT16 exhaust_penta_menu_pos  = {
 	.x = 832,
 	.y = 505,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_tropy_menu_pos  = {
+static const RECT16 exhaust_tropy_menu_pos  = {
 	.x = 832,
 	.y = 509,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_joe_menu_pos  = {
+static const RECT16 exhaust_joe_menu_pos  = {
 	.x = 848,
 	.y = 510,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_roo_menu_pos  = {
+static const RECT16 exhaust_roo_menu_pos  = {
 	.x = 864,
 	.y = 505,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_papu_menu_pos  = {
+static const RECT16 exhaust_papu_menu_pos  = {
 	.x = 864,
 	.y = 508,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_pinstripe_menu_pos  = {
+static const RECT16 exhaust_pinstripe_menu_pos  = {
 	.x = 880,
 	.y = 507,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_pura_menu_pos  = {
+static const RECT16 exhaust_pura_menu_pos  = {
 	.x = 880,
 	.y = 508,
 	.w = 16,
@@ -1596,798 +1596,798 @@ static const Texture PAINTP_M[]  =
 /* race CLUT positions -- from CTR-ModSDK mods/Modules/PaintJobs_OnlyUSA/src/paints/PAINTP_R.c (GPL-3.0) */
 // CLUT pos
 
-static const RECT motorside_crash_pos  = {
+static const RECT16 motorside_crash_pos  = {
 	.x = 112,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_crash_pos  = {
+static const RECT16 exhaust_crash_pos  = {
 	.x = 496,
 	.y = 257,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_crash_pos  = {
+static const RECT16 back_crash_pos  = {
 	.x = 112,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_crash_pos  = {
+static const RECT16 floor_crash_pos  = {
 	.x = 304,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_crash_pos  = {
+static const RECT16 motortop_crash_pos  = {
 	.x = 96,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_crash_pos  = {
+static const RECT16 brown_crash_pos  = {
 	.x = 976,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_crash_pos  = {
+static const RECT16 front_crash_pos  = {
 	.x = 112,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_crash_pos  = {
+static const RECT16 bridge_crash_pos  = {
 	.x = 496,
 	.y = 256,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_cortex_pos  = {
+static const RECT16 floor_cortex_pos  = {
 	.x = 960,
 	.y = 226,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_tiny_pos  = {
+static const RECT16 floor_tiny_pos  = {
 	.x = 960,
 	.y = 227,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_coco_pos  = {
+static const RECT16 floor_coco_pos  = {
 	.x = 960,
 	.y = 231,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_ngin_pos  = {
+static const RECT16 floor_ngin_pos  = {
 	.x = 960,
 	.y = 232,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_dingo_pos  = {
+static const RECT16 floor_dingo_pos  = {
 	.x = 960,
 	.y = 234,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_polar_pos  = {
+static const RECT16 floor_polar_pos  = {
 	.x = 960,
 	.y = 236,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_pura_pos  = {
+static const RECT16 floor_pura_pos  = {
 	.x = 960,
 	.y = 238,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_pinstripe_pos  = {
+static const RECT16 floor_pinstripe_pos  = {
 	.x = 960,
 	.y = 239,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_roo_pos  = {
+static const RECT16 floor_roo_pos  = {
 	.x = 960,
 	.y = 244,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_joe_pos  = {
+static const RECT16 floor_joe_pos  = {
 	.x = 960,
 	.y = 245,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_tropy_pos  = {
+static const RECT16 floor_tropy_pos  = {
 	.x = 960,
 	.y = 246,
 	.w = 16,
 	.h = 1
 };
-static const RECT floor_penta_pos  = {
+static const RECT16 floor_penta_pos  = {
 	.x = 960,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT floor_fakecrash_pos  = {
+static const RECT16 floor_fakecrash_pos  = {
 	.x = 960,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_cortex_pos  = {
+static const RECT16 motortop_cortex_pos  = {
 	.x = 128,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_tiny_pos  = {
+static const RECT16 motortop_tiny_pos  = {
 	.x = 144,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_coco_pos  = {
+static const RECT16 motortop_coco_pos  = {
 	.x = 160,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_ngin_pos  = {
+static const RECT16 motortop_ngin_pos  = {
 	.x = 160,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_dingo_pos  = {
+static const RECT16 motortop_dingo_pos  = {
 	.x = 176,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_polar_pos  = {
+static const RECT16 motortop_polar_pos  = {
 	.x = 192,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_pura_pos  = {
+static const RECT16 motortop_pura_pos  = {
 	.x = 192,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_pinstripe_pos  = {
+static const RECT16 motortop_pinstripe_pos  = {
 	.x = 208,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_papu_pos  = {
+static const RECT16 motortop_papu_pos  = {
 	.x = 224,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_roo_pos  = {
+static const RECT16 motortop_roo_pos  = {
 	.x = 224,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motortop_joe_pos  = {
+static const RECT16 motortop_joe_pos  = {
 	.x = 240,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_tropy_pos  = {
+static const RECT16 motortop_tropy_pos  = {
 	.x = 240,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_penta_pos  = {
+static const RECT16 motortop_penta_pos  = {
 	.x = 240,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
-static const RECT motortop_fakecrash_pos  = {
+static const RECT16 motortop_fakecrash_pos  = {
 	.x = 448,
 	.y = 260,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_cortex_pos  = {
+static const RECT16 brown_cortex_pos  = {
 	.x = 992,
 	.y = 225,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_tiny_pos  = {
+static const RECT16 brown_tiny_pos  = {
 	.x = 992,
 	.y = 226,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_coco_pos  = {
+static const RECT16 brown_coco_pos  = {
 	.x = 992,
 	.y = 227,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_ngin_pos  = {
+static const RECT16 brown_ngin_pos  = {
 	.x = 992,
 	.y = 228,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_dingo_pos  = {
+static const RECT16 brown_dingo_pos  = {
 	.x = 992,
 	.y = 229,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_polar_pos  = {
+static const RECT16 brown_polar_pos  = {
 	.x = 992,
 	.y = 230,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_pura_pos  = {
+static const RECT16 brown_pura_pos  = {
 	.x = 992,
 	.y = 231,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_pinstripe_pos  = {
+static const RECT16 brown_pinstripe_pos  = {
 	.x = 992,
 	.y = 232,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_papu_pos  = {
+static const RECT16 brown_papu_pos  = {
 	.x = 992,
 	.y = 234,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_roo_pos  = {
+static const RECT16 brown_roo_pos  = {
 	.x = 992,
 	.y = 236,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_joe_pos  = {
+static const RECT16 brown_joe_pos  = {
 	.x = 992,
 	.y = 237,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_tropy_pos  = {
+static const RECT16 brown_tropy_pos  = {
 	.x = 992,
 	.y = 238,
 	.w = 16,
 	.h = 1
 };
-static const RECT brown_penta_pos  = {
+static const RECT16 brown_penta_pos  = {
 	.x = 992,
 	.y = 239,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT brown_fakecrash_pos  = {
+static const RECT16 brown_fakecrash_pos  = {
 	.x = 992,
 	.y = 240,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_cortex_pos  = {
+static const RECT16 front_cortex_pos  = {
 	.x = 128,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_tiny_pos  = {
+static const RECT16 front_tiny_pos  = {
 	.x = 144,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_coco_pos  = {
+static const RECT16 front_coco_pos  = {
 	.x = 160,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_ngin_pos  = {
+static const RECT16 front_ngin_pos  = {
 	.x = 160,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_dingo_pos  = {
+static const RECT16 front_dingo_pos  = {
 	.x = 176,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_polar_pos  = {
+static const RECT16 front_polar_pos  = {
 	.x = 192,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_pura_pos  = {
+static const RECT16 front_pura_pos  = {
 	.x = 208,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_pinstripe_pos  = {
+static const RECT16 front_pinstripe_pos  = {
 	.x = 208,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_papu_pos  = {
+static const RECT16 front_papu_pos  = {
 	.x = 208,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_roo_pos  = {
+static const RECT16 front_roo_pos  = {
 	.x = 224,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_joe_pos  = {
+static const RECT16 front_joe_pos  = {
 	.x = 224,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_tropy_pos  = {
+static const RECT16 front_tropy_pos  = {
 	.x = 240,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
-static const RECT front_penta_pos  = {
+static const RECT16 front_penta_pos  = {
 	.x = 240,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT front_fakecrash_pos  = {
+static const RECT16 front_fakecrash_pos  = {
 	.x = 448,
 	.y = 258,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_penta_pos  = {
+static const RECT16 bridge_penta_pos  = {
 	.x = 256,
 	.y = 246,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_fakecrash_pos  = {
+static const RECT16 bridge_fakecrash_pos  = {
 	.x = 256,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_dingo_pos  = {
+static const RECT16 bridge_dingo_pos  = {
 	.x = 320,
 	.y = 259,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_polar_pos  = {
+static const RECT16 bridge_polar_pos  = {
 	.x = 336,
 	.y = 258,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_pura_pos  = {
+static const RECT16 bridge_pura_pos  = {
 	.x = 352,
 	.y = 256,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_pinstripe_pos  = {
+static const RECT16 bridge_pinstripe_pos  = {
 	.x = 368,
 	.y = 258,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_papu_pos  = {
+static const RECT16 bridge_papu_pos  = {
 	.x = 368,
 	.y = 262,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_tiny_pos  = {
+static const RECT16 bridge_tiny_pos  = {
 	.x = 400,
 	.y = 257,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_coco_pos  = {
+static const RECT16 bridge_coco_pos  = {
 	.x = 416,
 	.y = 262,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_ngin_pos  = {
+static const RECT16 bridge_ngin_pos  = {
 	.x = 432,
 	.y = 258,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_cortex_pos  = {
+static const RECT16 bridge_cortex_pos  = {
 	.x = 496,
 	.y = 263,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_roo_pos  = {
+static const RECT16 bridge_roo_pos  = {
 	.x = 928,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT bridge_joe_pos  = {
+static const RECT16 bridge_joe_pos  = {
 	.x = 928,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT bridge_tropy_pos  = {
+static const RECT16 bridge_tropy_pos  = {
 	.x = 944,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_cortex_pos  = {
+static const RECT16 motorside_cortex_pos  = {
 	.x = 128,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_tiny_pos  = {
+static const RECT16 motorside_tiny_pos  = {
 	.x = 144,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_coco_pos  = {
+static const RECT16 motorside_coco_pos  = {
 	.x = 160,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_ngin_pos  = {
+static const RECT16 motorside_ngin_pos  = {
 	.x = 176,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_dingo_pos  = {
+static const RECT16 motorside_dingo_pos  = {
 	.x = 176,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_polar_pos  = {
+static const RECT16 motorside_polar_pos  = {
 	.x = 192,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_pura_pos  = {
+static const RECT16 motorside_pura_pos  = {
 	.x = 192,
 	.y = 254,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_pinstripe_pos  = {
+static const RECT16 motorside_pinstripe_pos  = {
 	.x = 208,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_papu_pos  = {
+static const RECT16 motorside_papu_pos  = {
 	.x = 208,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_roo_pos  = {
+static const RECT16 motorside_roo_pos  = {
 	.x = 224,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_joe_pos  = {
+static const RECT16 motorside_joe_pos  = {
 	.x = 224,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_tropy_pos  = {
+static const RECT16 motorside_tropy_pos  = {
 	.x = 240,
 	.y = 251,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT motorside_penta_pos  = {
+static const RECT16 motorside_penta_pos  = {
 	.x = 448,
 	.y = 257,
 	.w = 16,
 	.h = 1
 };
-static const RECT motorside_fakecrash_pos  = {
+static const RECT16 motorside_fakecrash_pos  = {
 	.x = 448,
 	.y = 261,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_penta_pos  = {
+static const RECT16 exhaust_penta_pos  = {
 	.x = 256,
 	.y = 247,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_fakecrash_pos  = {
+static const RECT16 exhaust_fakecrash_pos  = {
 	.x = 256,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_dingo_pos  = {
+static const RECT16 exhaust_dingo_pos  = {
 	.x = 320,
 	.y = 260,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_polar_pos  = {
+static const RECT16 exhaust_polar_pos  = {
 	.x = 336,
 	.y = 257,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_pura_pos  = {
+static const RECT16 exhaust_pura_pos  = {
 	.x = 336,
 	.y = 263,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_pinstripe_pos  = {
+static const RECT16 exhaust_pinstripe_pos  = {
 	.x = 368,
 	.y = 260,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_papu_pos  = {
+static const RECT16 exhaust_papu_pos  = {
 	.x = 368,
 	.y = 263,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_cortex_pos  = {
+static const RECT16 exhaust_cortex_pos  = {
 	.x = 384,
 	.y = 256,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_tiny_pos  = {
+static const RECT16 exhaust_tiny_pos  = {
 	.x = 400,
 	.y = 258,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_coco_pos  = {
+static const RECT16 exhaust_coco_pos  = {
 	.x = 416,
 	.y = 263,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_ngin_pos  = {
+static const RECT16 exhaust_ngin_pos  = {
 	.x = 432,
 	.y = 259,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_roo_pos  = {
+static const RECT16 exhaust_roo_pos  = {
 	.x = 928,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
-static const RECT exhaust_joe_pos  = {
+static const RECT16 exhaust_joe_pos  = {
 	.x = 944,
 	.y = 245,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT exhaust_tropy_pos  = {
+static const RECT16 exhaust_tropy_pos  = {
 	.x = 944,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_cortex_pos  = {
+static const RECT16 back_cortex_pos  = {
 	.x = 128,
 	.y = 255,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_tiny_pos  = {
+static const RECT16 back_tiny_pos  = {
 	.x = 144,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_coco_pos  = {
+static const RECT16 back_coco_pos  = {
 	.x = 160,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_ngin_pos  = {
+static const RECT16 back_ngin_pos  = {
 	.x = 176,
 	.y = 248,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_dingo_pos  = {
+static const RECT16 back_dingo_pos  = {
 	.x = 176,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_polar_pos  = {
+static const RECT16 back_polar_pos  = {
 	.x = 192,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_pura_pos  = {
+static const RECT16 back_pura_pos  = {
 	.x = 192,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_pinstripe_pos  = {
+static const RECT16 back_pinstripe_pos  = {
 	.x = 208,
 	.y = 252,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_papu_pos  = {
+static const RECT16 back_papu_pos  = {
 	.x = 208,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_roo_pos  = {
+static const RECT16 back_roo_pos  = {
 	.x = 224,
 	.y = 250,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_joe_pos  = {
+static const RECT16 back_joe_pos  = {
 	.x = 240,
 	.y = 249,
 	.w = 16,
 	.h = 1
 };
-static const RECT back_tropy_pos  = {
+static const RECT16 back_tropy_pos  = {
 	.x = 240,
 	.y = 253,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_penta_pos  = {
+static const RECT16 back_penta_pos  = {
 	.x = 448,
 	.y = 256,
 	.w = 16,
 	.h = 1
 };
 
-static const RECT back_fakecrash_pos  = {
+static const RECT16 back_fakecrash_pos  = {
 	.x = 448,
 	.y = 259,
 	.w = 16,

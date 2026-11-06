@@ -382,8 +382,8 @@ static b32 s_fireIsBlue;
 
 static void NativeMods_SetFire(b32 blue)
 {
-	RECT flames = {176, 256, 16, 1};
-	RECT plumes = {464, 257, 16, 1};
+	RECT16 flames = {176, 256, 16, 1};
+	RECT16 plumes = {464, 257, 16, 1};
 
 	if (s_fireIsBlue == blue)
 	{
@@ -447,11 +447,11 @@ static void NativeMods_LoadPaint(s32 character, b32 menu, b32 race)
 	{
 		if (menu)
 		{
-			LoadImage((RECT *)PAINTP_M[character].p[i], (void *)colors->p[i]);
+			LoadImage((RECT16 *)PAINTP_M[character].p[i], (void *)colors->p[i]);
 		}
 		if (race)
 		{
-			LoadImage((RECT *)PAINTP_R[character].p[i], (void *)colors->p[i]);
+			LoadImage((RECT16 *)PAINTP_R[character].p[i], (void *)colors->p[i]);
 		}
 	}
 }
@@ -505,7 +505,7 @@ void NativeMods_CharacterMenuFrame(void)
 struct KartTexEntry
 {
 	const char *image;
-	const RECT *pos;
+	const RECT16 *pos;
 };
 
 #include "mods/mod_karttex_data.h"
@@ -514,11 +514,11 @@ static void NativeMods_LoadKartTextures(void)
 {
 	for (u32 i = 0; i < sizeof(KARTTEX1) / sizeof(KARTTEX1[0]); i++)
 	{
-		LoadImage((RECT *)KARTTEX1[i].pos, (void *)KARTTEX1[i].image);
+		LoadImage((RECT16 *)KARTTEX1[i].pos, (void *)KARTTEX1[i].image);
 	}
 	for (u32 i = 0; i < sizeof(KARTTEX2) / sizeof(KARTTEX2[0]); i++)
 	{
-		LoadImage((RECT *)KARTTEX2[i].pos, (void *)KARTTEX2[i].image);
+		LoadImage((RECT16 *)KARTTEX2[i].pos, (void *)KARTTEX2[i].image);
 	}
 }
 
