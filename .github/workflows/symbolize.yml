@@ -1,0 +1,41 @@
+name: Symbolize crash
+
+# Rebuilds the production configuration and maps crash addresses to functions.
+on:
+  workflow_dispatch:
+    inputs:
+      addrs:
+        description: 'Addresses (hex, space separated)'
+        required: true
+
+jobs:
+  symbolize:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:20260610
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install host tools
+        run: |
+          command -v cmake > /dev/null || (apt-get update -qq && apt-get install -y -qq cmake > /dev/null)
+          command -v python3 > /dev/null || (apt-get update -qq && apt-get install -y -qq python3 > /dev/null)
+      - name: Build and symbolize
+        run: |
+          git config --global --add safe.directory '*'
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITARM=/opt/devkitpro/devkitARM
+          chmod +x platform/n3ds/tools/bin/bannertool platform/n3ds/tools/bin/makerom
+          ./build3ds.sh --release --no-cia > /dev/null
+          ELF=$(find build-3ds-release -maxdepth 2 -name '*.elf' | head -1)
+          echo "ELF: $ELF"
+          for a in ${{ inputs.addrs }}; do
+            echo "== $a"
+            $DEVKITARM/bin/arm-none-eabi-addr2line -f -i -C -e "$ELF" $a
+          done
+          echo "== disassembly around the first address"
+          FIRST=$(echo ${{ inputs.addrs }} | cut -d' ' -f1)
+          START=$(printf '0x%x' $(( FIRST - 0x40 )))
+          STOP=$(printf '0x%x' $(( FIRST + 0x20 )))
+          $DEVKITARM/bin/arm-none-eabi-objdump -d -l --start-address=$START --stop-address=$STOP "$ELF" | tail -60
