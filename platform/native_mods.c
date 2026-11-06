@@ -365,6 +365,40 @@ b32 NativeMods_QueueRivalModels(struct BigHeader *bigfile, void (*callback)(stru
 	return true;
 }
 
+/* SaveRAM, the native way: the extra CPU models cost MEMPACK room retail never had to spare, so
+ * in a randomized race the JIT pools (threads, instances, stacks, particles...; ~85 KB in a 1P
+ * race) come from this host buffer instead -- the job SaveRAM did on PS1 by moving pools into
+ * unused executable space. Every other mode keeps retail's MEMPACK layout untouched. */
+static u8 s_modPoolArena[192 * 1024] __attribute__((aligned(16)));
+static u32 s_modPoolUsed;
+static b32 s_modPoolArmed;
+
+void NativeMods_PoolArenaBegin(void)
+{
+	s_modPoolUsed = 0;
+	s_modPoolArmed = NativeMods_RandomRivalsAllowed();
+}
+
+void NativeMods_PoolArenaEnd(void)
+{
+	s_modPoolArmed = false;
+}
+
+void *NativeMods_PoolAlloc(int size)
+{
+	u32 aligned = ((u32)size + 15u) & ~15u;
+	void *p;
+
+	if (!s_modPoolArmed || (size <= 0) || ((s_modPoolUsed + aligned) > sizeof(s_modPoolArena)))
+	{
+		return NULL;
+	}
+
+	p = &s_modPoolArena[s_modPoolUsed];
+	s_modPoolUsed += aligned;
+	return p;
+}
+
 void NativeMods_ClearRivalModels(void)
 {
 	for (s32 i = 0; i < 8; i++)

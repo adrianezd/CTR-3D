@@ -245,6 +245,10 @@ void MainInit_JitPoolsNew(struct GameTracker *gGT)
 
 	MEMPACK_PushState();
 
+#ifdef CTR_NATIVE
+	NativeMods_PoolArenaBegin();
+#endif
+
 	JitPool_Init(&gGT->JitPools.thread, (renderBucketSize * 3) >> 7, sizeof(struct Thread), rdata.s_ThreadPool);
 	JitPool_Init(&gGT->JitPools.instance, renderBucketSize >> 5, sizeof(struct Instance) + (sizeof(struct InstDrawPerPlayer) * gGT->numPlyrCurrGame),
 	             rdata.s_InstancePool);
@@ -262,6 +266,9 @@ void MainInit_JitPoolsNew(struct GameTracker *gGT)
 	JitPool_Init(&gGT->JitPools.particle, numParticle, sizeof(struct Particle), rdata.s_ParticlePool);
 	JitPool_Init(&gGT->JitPools.oscillator, numParticle, 0x18, rdata.s_OscillatorPool);
 	JitPool_Init(&gGT->JitPools.rain, poolScale >> 9, sizeof(struct RainLocal), rdata.s_RainPool);
+#ifdef CTR_NATIVE
+	NativeMods_PoolArenaEnd();
+#endif
 
 #ifndef CTR_NATIVE
 	gGT->ptrRenderBucketInstance = MEMPACK_AllocMem(renderBucketSize);

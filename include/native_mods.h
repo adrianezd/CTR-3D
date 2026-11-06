@@ -63,6 +63,9 @@ void NativeMods_ClearRivalModels(void);
 void NativeMods_ResolveRivalModels(void);
 void NativeMods_StoreRivalModelPtrs(struct GameTracker *gGT);
 struct Model *NativeMods_FindRivalModel(char *searchName);
+void NativeMods_PoolArenaBegin(void);
+void NativeMods_PoolArenaEnd(void);
+void *NativeMods_PoolAlloc(int size);
 
 /* CustomFlag: game/RaceFlag.c (3 = blue checkers) */
 int NativeMods_FlagStyle(int style);

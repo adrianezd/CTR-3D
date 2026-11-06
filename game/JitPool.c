@@ -29,7 +29,16 @@ void JitPool_Init(struct JitPool *AP, int maxItems, int itemSize, char *name)
 	AP->maxItems = maxItems;
 	AP->itemSize = itemSize;
 	AP->poolSize = maxItems * itemSize;
+#ifdef CTR_NATIVE
+	// CharacterRandomizer: in a randomized race the pools live outside MEMPACK (NativeMods_PoolAlloc)
+	AP->ptrPoolData = NativeMods_PoolAlloc(AP->poolSize);
+	if (AP->ptrPoolData == NULL)
+	{
+		AP->ptrPoolData = MEMPACK_AllocMem(AP->poolSize);
+	}
+#else
 	AP->ptrPoolData = MEMPACK_AllocMem(AP->poolSize);
+#endif
 	JitPool_Clear(AP);
 }
 
