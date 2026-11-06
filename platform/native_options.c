@@ -53,15 +53,28 @@ static struct NativeOptToggle s_optToggles[] = {
 #if defined(CTR_NATIVE_TRACK_RENDERER) && CTR_NATIVE_TRACK_RENDERER
     {LNG_UNUSED_0E8, &g_dbg_trackBilinear, N3DS_TrackAtlas_ApplyFilter, 3},
 #endif
-    /* community mods, platform/native_mods.c */
+};
+#define OPT_TOGGLE_COUNT ((s32)(sizeof(s_optToggles) / sizeof(s_optToggles[0])))
+
+/* The MODS submenu (last OPTIONS row): community mods and the CTR Unlimited-style modes, all in
+ * platform/native_mods.c, then the adventure difficulty selector (row MOD_TOGGLE_COUNT). */
+static struct NativeOptToggle s_modToggles[] = {
     {LNG_UNUSED_0EF, &g_modEngineSelect, NULL, 4},
     {LNG_UNUSED_0F0, &g_modRandomRivals, NULL, 5},
     {LNG_UNUSED_0F1, &g_modBlueFire, NULL, 6},
     {LNG_UNUSED_0F2, &g_modBlueFlag, NULL, 7},
     {LNG_UNUSED_0F4, &g_modPaintJobs, NULL, 8},
     {LNG_UNUSED_0F5, &g_modKartTextures, NULL, 9},
+    {LNG_UNUSED_0F6, &g_modAdvRandom, NULL, 10},
+    {LNG_UNUSED_0F8, &g_modMirror, NULL, 11},
+    {LNG_UNUSED_0F9, &g_modMoonGravity, NULL, 12},
+    {LNG_UNUSED_0FA, &g_modItemChaos, NULL, 13},
+    {LNG_UNUSED_0FB, &g_modIcy, NULL, 14},
 };
-#define OPT_TOGGLE_COUNT ((s32)(sizeof(s_optToggles) / sizeof(s_optToggles[0])))
+#define MOD_TOGGLE_COUNT ((s32)(sizeof(s_modToggles) / sizeof(s_modToggles[0])))
+#define OPT_SLOT_MODS LNG_UNUSED_0F7
+#define OPT_SLOT_ADV_DIFFICULTY LNG_UNUSED_0FF
+#define OPT_ADV_LEVELS 6
 
 /* Language selector: the row right after the toggles (LNG_UNUSED_0E9). Confirm cycles it.
  *
@@ -87,7 +100,7 @@ static const s16 s_optLangFile[OPT_LANG_COUNT] = {1, 3, 4, 5, 6, 7};
  * them here. Language names are written in their own language everywhere else (so you can still
  * find your language in a menu you cannot read), which is why these rows also fit in 18.
  */
-#define OPT_TEXT_TOGGLES 10
+#define OPT_TEXT_TOGGLES 15
 
 struct NativeOptText
 {
@@ -98,62 +111,84 @@ struct NativeOptText
 	const char *languageName;                  /* label of the language row */
 	const char *langNames[OPT_LANG_COUNT];     /* how each language is written in this menu */
 	s32 langNameWidth;                         /* the language name is right-aligned to this */
+	const char *modsName;                      /* the OPTIONS row that opens MODS */
+	const char *advName;                       /* label of the adventure difficulty row */
+	const char *advLevels[OPT_ADV_LEVELS];     /* classic, easy, medium, hard, super hard, ultra hard */
 };
 
 static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
     /* English (NTSC-U file 1): unchanged */
     {"OPTIONS",
-     {"PAL PENTA", "RESERVES METER", "BOTTOM MAP", "TEXTURE FILTER", "ENGINE SELECT", "RANDOM RIVALS", "BLUE FIRE", "BLUE FLAG", "PAINT JOBS", "KART TEXTURES"},
+     {"PAL PENTA", "RESERVES METER", "BOTTOM MAP", "TEXTURE FILTER", "ENGINE SELECT", "RANDOM RIVALS", "BLUE FIRE", "BLUE FLAG", "PAINT JOBS", "KART TEXTURES", "ADV RANDOMIZER", "MIRROR MODE", "MOON GRAVITY", "ITEM CHAOS", "ICY TRACKS"},
      "OFF",
      "ON",
      "LANGUAGE",
      {"ENGLISH", "FRENCH", "GERMAN", "ITALIAN", "SPANISH", "DUTCH"},
-     9},
+     9,
+     "MODS",
+     "ADVENTURE",
+     {"CLASSIC", "EASY", "MEDIUM", "HARD", "SUPER", "ULTRA"}},
     /* French */
     {"OPTIONS",
-     {"PENTA PAL", "JAUGE RESERVE", "CARTE EN BAS", "FILTRE TEXTURE", "CHOIX MOTEUR", "RIVAUX HASARD", "FEU BLEU", "DRAPEAU BLEU", "PEINTURES", "TEXTURES KART"},
+     {"PENTA PAL", "JAUGE RESERVE", "CARTE EN BAS", "FILTRE TEXTURE", "CHOIX MOTEUR", "RIVAUX HASARD", "FEU BLEU", "DRAPEAU BLEU", "PEINTURES", "TEXTURES KART", "AVENT. HASARD", "MODE MIROIR", "GRAVITE LUNE", "CHAOS OBJETS", "PISTES GLACE"},
      "NON",
      "OUI",
      "LANGUE",
      {"ENGLISH", "FRANCAIS", "DEUTSCH", "ITALIANO", "ESPA\003NOL", "NEDERLANDS"},
-     10},
+     10,
+     "MODS",
+     "AVENTURE",
+     {"NORMAL", "FACILE", "MOYEN", "DUR", "SUPER", "ULTRA"}},
     /* German */
     {"OPTIONEN",
-     {"PAL PENTA", "RESERVEANZEIGE", "KARTE UNTEN", "TEXTURFILTER", "MOTORWAHL", "ZUFALLSGEGNER", "BLAUES FEUER", "BLAUE FLAGGE", "LACKIERUNGEN", "KARTTEXTUREN"},
+     {"PAL PENTA", "RESERVEANZEIGE", "KARTE UNTEN", "TEXTURFILTER", "MOTORWAHL", "ZUFALLSGEGNER", "BLAUES FEUER", "BLAUE FLAGGE", "LACKIERUNGEN", "KARTTEXTUREN", "ABENTEUER ZUF.", "SPIEGELMODUS", "MONDGRAVITAT", "ITEM CHAOS", "EISSTRECKEN"},
      "AUS",
      "EIN",
      "SPRACHE",
      {"ENGLISH", "FRANCAIS", "DEUTSCH", "ITALIANO", "ESPA\003NOL", "NEDERLANDS"},
-     10},
+     10,
+     "MODS",
+     "ABENTEUER",
+     {"NORMAL", "LEICHT", "MITTEL", "SCHWER", "SUPER", "ULTRA"}},
     /* Italian */
     {"OPZIONI",
-     {"PENTA PAL", "BARRA RISERVA", "MAPPA IN BASSO", "FILTRO TEXTURE", "SCELTA MOTORE", "RIVALI CASUALI", "FUOCO BLU", "BANDIERA BLU", "VERNICI", "TEXTURE KART"},
+     {"PENTA PAL", "BARRA RISERVA", "MAPPA IN BASSO", "FILTRO TEXTURE", "SCELTA MOTORE", "RIVALI CASUALI", "FUOCO BLU", "BANDIERA BLU", "VERNICI", "TEXTURE KART", "AVVENT. CASUALE", "MODO SPECCHIO", "GRAVITA LUNARE", "CAOS OGGETTI", "PISTE GHIACCIO"},
      "NO",
      "SI",
      "LINGUA",
      {"ENGLISH", "FRANCAIS", "DEUTSCH", "ITALIANO", "ESPA\003NOL", "NEDERLANDS"},
-     10},
+     10,
+     "MODS",
+     "AVVENTURA",
+     {"NORMALE", "FACILE", "MEDIA", "DURA", "SUPER", "ULTRA"}},
     /* Spanish */
     {"OPCIONES",
-     {"PENTA PAL", "MEDIDOR RESERVA", "MAPA INFERIOR", "FILTRO TEXTURAS", "ELEGIR MOTOR", "RIVALES AZAR", "FUEGO AZUL", "BANDERA AZUL", "PINTURAS", "TEXTURAS KART"},
+     {"PENTA PAL", "MEDIDOR RESERVA", "MAPA INFERIOR", "FILTRO TEXTURAS", "ELEGIR MOTOR", "RIVALES AZAR", "FUEGO AZUL", "BANDERA AZUL", "PINTURAS", "TEXTURAS KART", "AVENTURA AZAR", "MODO ESPEJO", "GRAVEDAD LUNAR", "CAOS OBJETOS", "PISTAS HIELO"},
      "NO",
      "SI",
      "IDIOMA",
      {"ENGLISH", "FRANCAIS", "DEUTSCH", "ITALIANO", "ESPA\003NOL", "NEDERLANDS"},
-     10},
+     10,
+     "MODS",
+     "AVENTURA",
+     {"CLASICA", "FACIL", "MEDIA", "DIFICIL", "SUPER", "ULTRA"}},
     /* Dutch */
     {"OPTIES",
-     {"PAL PENTA", "RESERVEMETER", "KAART ONDER", "TEXTUURFILTER", "MOTORKEUZE", "RANDOM RIVALEN", "BLAUW VUUR", "BLAUWE VLAG", "LAKKEN", "KARTTEXTUREN"},
+     {"PAL PENTA", "RESERVEMETER", "KAART ONDER", "TEXTUURFILTER", "MOTORKEUZE", "RANDOM RIVALEN", "BLAUW VUUR", "BLAUWE VLAG", "LAKKEN", "KARTTEXTUREN", "AVONT. RANDOM", "SPIEGELMODUS", "MAANZWAARTE", "ITEM CHAOS", "IJSBANEN"},
      "UIT",
      "AAN",
      "TAAL",
      {"ENGLISH", "FRANCAIS", "DEUTSCH", "ITALIANO", "ESPA\003NOL", "NEDERLANDS"},
-     10},
+     10,
+     "MODS",
+     "AVONTUUR",
+     {"NORMAAL", "SIMPEL", "MEDIUM", "ZWAAR", "SUPER", "ULTRA"}},
 };
 
 /* The label strings the string table points at. RefreshLabels rewrites them in place. */
 #define OPT_LABEL_MAX 48
-static char s_optLabelBuf[OPT_TOGGLE_COUNT + 1][OPT_LABEL_MAX];
+static char s_optLabelBuf[OPT_TOGGLE_COUNT + 2][OPT_LABEL_MAX];
+static char s_modLabelBuf[MOD_TOGGLE_COUNT + 1][OPT_LABEL_MAX];
 
 /* Characters that take room on screen: the PAL tilde prefix (0x03) does not. */
 static s32 NativeOptions_VisibleLen(const char *text)
@@ -285,21 +320,42 @@ static void NativeOptions_CycleLanguage(void)
 /* One row per toggle, then the language selector (row OPT_TOGGLE_COUNT), then the terminator.
  * Built from s_optToggles by NativeOptions_BuildRows; the terminator is not a valid nav target,
  * so the last real row's down points at itself. */
-static struct MenuRow s_optMenuRows[OPT_TOGGLE_COUNT + 2];
+static struct MenuRow s_optMenuRows[OPT_TOGGLE_COUNT + 3]; /* toggles, LANGUAGE, MODS, terminator */
+static struct MenuRow s_modMenuRows[MOD_TOGGLE_COUNT + 2]; /* toggles, ADVENTURE, terminator */
+
+static void NativeOptions_FillRows(struct MenuRow *rows, const s16 *slots, s32 count)
+{
+	for (s32 i = 0; i < count; i++)
+	{
+		rows[i].stringIndex = slots[i];
+		rows[i].rowOnPressUp = (char)((i > 0) ? (i - 1) : 0);
+		rows[i].rowOnPressDown = (char)((i < count - 1) ? (i + 1) : (count - 1));
+		rows[i].rowOnPressLeft = (char)i;
+		rows[i].rowOnPressRight = (char)i;
+	}
+	rows[count] = (struct MenuRow){RECTMENU_STRING_NONE, 0, 0, 0, 0};
+}
 
 static void NativeOptions_BuildRows(void)
 {
-	const s32 last = OPT_TOGGLE_COUNT;
+	s16 slots[MOD_TOGGLE_COUNT + OPT_TOGGLE_COUNT + 2];
+	s32 n = 0;
 
-	for (s32 i = 0; i <= last; i++)
+	for (s32 i = 0; i < OPT_TOGGLE_COUNT; i++)
 	{
-		s_optMenuRows[i].stringIndex = (i < last) ? s_optToggles[i].lngSlot : LNG_UNUSED_0E9;
-		s_optMenuRows[i].rowOnPressUp = (char)((i > 0) ? (i - 1) : 0);
-		s_optMenuRows[i].rowOnPressDown = (char)((i < last) ? (i + 1) : last);
-		s_optMenuRows[i].rowOnPressLeft = (char)i;
-		s_optMenuRows[i].rowOnPressRight = (char)i;
+		slots[n++] = s_optToggles[i].lngSlot;
 	}
-	s_optMenuRows[last + 1] = (struct MenuRow){RECTMENU_STRING_NONE, 0, 0, 0, 0};
+	slots[n++] = LNG_UNUSED_0E9;
+	slots[n++] = OPT_SLOT_MODS;
+	NativeOptions_FillRows(s_optMenuRows, slots, n);
+
+	n = 0;
+	for (s32 i = 0; i < MOD_TOGGLE_COUNT; i++)
+	{
+		slots[n++] = s_modToggles[i].lngSlot;
+	}
+	slots[n++] = OPT_SLOT_ADV_DIFFICULTY;
+	NativeOptions_FillRows(s_modMenuRows, slots, n);
 }
 
 static void NativeOptions_RefreshLabels(void)
@@ -308,7 +364,7 @@ static void NativeOptions_RefreshLabels(void)
 	s32 stateWidth = NativeOptions_VisibleLen(text->stateOff);
 
 	/* every slot written below must exist in the loaded language's string table */
-	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0F5))
+	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0FF))
 	{
 		return;
 	}
@@ -327,7 +383,65 @@ static void NativeOptions_RefreshLabels(void)
 
 	NativeOptions_Compose(s_optLabelBuf[OPT_TOGGLE_COUNT], OPT_LABEL_MAX, text->languageName, text->langNames[s_optLangIndex], text->langNameWidth);
 	sdata->lngStrings[LNG_UNUSED_0E9] = s_optLabelBuf[OPT_TOGGLE_COUNT];
+
+	NativeOptions_Compose(s_optLabelBuf[OPT_TOGGLE_COUNT + 1], OPT_LABEL_MAX, text->modsName, "", 0);
+	sdata->lngStrings[OPT_SLOT_MODS] = s_optLabelBuf[OPT_TOGGLE_COUNT + 1];
+
+	for (s32 i = 0; i < MOD_TOGGLE_COUNT; i++)
+	{
+		NativeOptions_Compose(s_modLabelBuf[i], OPT_LABEL_MAX, text->toggleName[s_modToggles[i].textIndex], *s_modToggles[i].flag ? text->stateOn : text->stateOff,
+		                      stateWidth);
+		sdata->lngStrings[s_modToggles[i].lngSlot] = s_modLabelBuf[i];
+	}
+
+	{
+		s32 level = ((g_modAdvDifficulty >= 0) && (g_modAdvDifficulty < OPT_ADV_LEVELS)) ? g_modAdvDifficulty : 0;
+		s32 width = 0;
+
+		for (s32 i = 0; i < OPT_ADV_LEVELS; i++)
+		{
+			if (NativeOptions_VisibleLen(text->advLevels[i]) > width)
+			{
+				width = NativeOptions_VisibleLen(text->advLevels[i]);
+			}
+		}
+		NativeOptions_Compose(s_modLabelBuf[MOD_TOGGLE_COUNT], OPT_LABEL_MAX, text->advName, text->advLevels[level], width);
+		sdata->lngStrings[OPT_SLOT_ADV_DIFFICULTY] = s_modLabelBuf[MOD_TOGGLE_COUNT];
+	}
 }
+
+static void NativeOptions_ModMenuProc(struct RectMenu *menu)
+{
+	if (menu->funcState != RECTMENU_FUNC_STATE_INPUT)
+	{
+		return;
+	}
+
+	s16 row = menu->rowSelected;
+
+	if (row == -1)
+	{
+		menu->ptrPrevBox_InHierarchy->state &= ~(ONLY_DRAW_TITLE | DRAW_NEXT_MENU_IN_HIERARCHY);
+		return;
+	}
+
+	if ((row >= 0) && (row < MOD_TOGGLE_COUNT))
+	{
+		*s_modToggles[row].flag ^= 1;
+	}
+	else if (row == MOD_TOGGLE_COUNT)
+	{
+		g_modAdvDifficulty = (g_modAdvDifficulty + 1) % OPT_ADV_LEVELS;
+	}
+	NativeOptions_RefreshLabels();
+}
+
+static struct RectMenu s_modMenu = {
+    .stringIndexTitle = RECTMENU_STRING_NONE,
+    .state = CENTER_ON_X | USE_SMALL_FONT,
+    .rows = &s_modMenuRows[0],
+    .funcPtr = NativeOptions_ModMenuProc,
+};
 
 static void NativeOptions_MenuProc(struct RectMenu *menu)
 {
@@ -362,6 +476,11 @@ static void NativeOptions_MenuProc(struct RectMenu *menu)
 	else if (row == OPT_TOGGLE_COUNT)
 	{
 		NativeOptions_CycleLanguage();
+	}
+	else if (row == OPT_TOGGLE_COUNT + 1)
+	{
+		menu->ptrNextBox_InHierarchy = &s_modMenu;
+		menu->state |= (ONLY_DRAW_TITLE | DRAW_NEXT_MENU_IN_HIERARCHY);
 	}
 }
 
@@ -436,7 +555,7 @@ void NativeOptions_InstallStrings(void)
 	NativeMods_InstallStrings();
 
 #ifdef __3DS__
-	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0F5))
+	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0FF))
 	{
 		return;
 	}

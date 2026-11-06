@@ -1019,6 +1019,14 @@ void AH_WarpPad_LInB(struct Instance *inst)
 
 	warppadObj->levelID = levelID;
 
+	// AdvRandomizer: the pad keeps the unlock requirement of its position (levelID until the
+	// swap below); the track behind it, its rewards and the race it loads come from trackID.
+#ifdef CTR_NATIVE
+	const int trackID = NativeMods_AdvRandomPad(levelID);
+#else
+	const int trackID = levelID;
+#endif
+
 	unlockItem_modelID = 0;
 	unlockItem_numOwned = 0;
 	unlockItem_numNeeded = -1;
@@ -1031,7 +1039,7 @@ void AH_WarpPad_LInB(struct Instance *inst)
 		// can we just do gGT->levelID-0x19?
 
 		// if trophy owned
-		if (CHECK_ADV_BIT(sdata->advProgress.rewards, levelID + ADV_REWARD_FIRST_TROPHY))
+		if (CHECK_ADV_BIT(sdata->advProgress.rewards, trackID + ADV_REWARD_FIRST_TROPHY))
 		{
 		GetKeysRequirement:
 
@@ -1094,6 +1102,9 @@ void AH_WarpPad_LInB(struct Instance *inst)
 		int *arrTokenCount = &gGT->currAdvProfile.numCtrTokens.red;
 		unlockItem_numOwned = arrTokenCount[levelID - AH_WP_ID_FIRST_GEM_CUP];
 	}
+
+	levelID = trackID;
+	warppadObj->levelID = levelID;
 
 	// if unlocked
 	if (unlockItem_numOwned >= unlockItem_numNeeded)

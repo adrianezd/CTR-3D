@@ -101,7 +101,11 @@ void AH_Garage_ThTick(struct Thread *t)
 	struct Instance *inst = t->inst;
 	struct Instance *drv_inst = gGT->drivers[0]->instSelf;
 	s32 levelID = gGT->levelID;
+#ifdef CTR_NATIVE
+	s32 hubID = NativeMods_AdvRandomHub(levelID - GEM_STONE_VALLEY);
+#else
 	s32 hubID = levelID - GEM_STONE_VALLEY;
+#endif
 	struct ScratchpadStruct *sps = CTR_SCRATCHPAD_PTR(struct ScratchpadStruct, 0x108);
 
 	// if door is not opening or closing
@@ -219,7 +223,11 @@ LAB_800aeb6c:
 		for (i = 0; i < AH_HUB_TRACK_COUNT; i++)
 		{
 			// if any trophy on this hub is not unlocked
+#ifdef CTR_NATIVE
+			if (!CHECK_ADV_BIT(adv->rewards, NativeMods_AdvRandomPad(check[i]) + ADV_REWARD_FIRST_TROPHY))
+#else
 			if (!CHECK_ADV_BIT(adv->rewards, check[i] + ADV_REWARD_FIRST_TROPHY))
+#endif
 			{
 				// boss is not open
 				goto LAB_800aebd0;
@@ -465,7 +473,11 @@ void AH_Garage_LInB(struct Instance *inst)
 		for (i = 0; i < AH_HUB_TRACK_COUNT; i++)
 		{
 			// if any trophy on this hub is not unlocked
+#ifdef CTR_NATIVE
+			if (!CHECK_ADV_BIT(adv->rewards, NativeMods_AdvRandomPad(check[i]) + ADV_REWARD_FIRST_TROPHY))
+#else
 			if (!CHECK_ADV_BIT(adv->rewards, check[i] + ADV_REWARD_FIRST_TROPHY))
+#endif
 			{
 				// boss is not open
 				goto GarageLocked;
@@ -477,7 +489,11 @@ void AH_Garage_LInB(struct Instance *inst)
 	if (bossIsOpen)
 	{
 		// check if boss was NOT beaten on this hub (levelID - 0x19)
+#ifdef CTR_NATIVE
+		bitIndex = data.BeatBossPrize[NativeMods_AdvRandomHub(levelID - GEM_STONE_VALLEY)];
+#else
 		bitIndex = data.BeatBossPrize[levelID - GEM_STONE_VALLEY];
+#endif
 		t->modelIndex = CHECK_ADV_BIT(adv->rewards, bitIndex) ? 2 : 1;
 	}
 

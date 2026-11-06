@@ -623,6 +623,7 @@ void VehBirth_SetConsts(struct Driver *driver)
 	{
 		NativePenta_ApplyPalClass(driver);
 	}
+	NativeMods_DriverConsts(driver);
 #endif
 
 	return;

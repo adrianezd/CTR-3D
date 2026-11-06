@@ -1262,6 +1262,10 @@ void VehPhysGeneral_SetHeldItem(struct Driver *driver)
 		}
 	}
 
+#ifdef CTR_NATIVE
+	NativeMods_ChaosItem(driver);
+#endif
+
 	// Set number of held items
 	if ((u32)driver->heldItemID - HELD_ITEM_BOMB_3X < (HELD_ITEM_MISSILE_3X - HELD_ITEM_BOMB_3X + 1))
 	{

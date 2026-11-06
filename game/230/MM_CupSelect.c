@@ -100,6 +100,10 @@ void MM_CupSelect_MenuProc(struct RectMenu *menu)
 	DecalFont_DrawLine(sdata->lngStrings[LNG_SELECT_CUP_RACE], D230.transitionMeta_cupSel[MM_CUP_SELECT_TITLE_META_INDEX].currX + MM_CUP_SELECT_TITLE_X_OFFSET,
 	                   D230.transitionMeta_cupSel[MM_CUP_SELECT_TITLE_META_INDEX].currY + MM_CUP_SELECT_TITLE_Y_OFFSET, FONT_BIG, MM_CUP_SELECT_TEXT_COLOR);
 
+#ifdef CTR_NATIVE
+	NativeMods_CustomCupsFrame(menu);
+#endif
+
 	// Loop through all four cups
 	for (u8 cupIndex = 0; cupIndex < GAME_PROGRESS_CUP_COUNT; cupIndex++)
 	{
@@ -126,6 +130,10 @@ void MM_CupSelect_MenuProc(struct RectMenu *menu)
 		startX = startX + MM_CUP_SELECT_CONTENT_X_OFFSET;
 		startY = startY + MM_CUP_SELECT_CONTENT_Y_OFFSET;
 
+#ifdef CTR_NATIVE
+		NativeMods_CustomCupsDraw(cupIndex, startX, startY);
+#endif
+
 		// loop through 3 stars to draw
 		for (u8 starIndex = 0; starIndex < GAME_PROGRESS_CUP_DIFFICULTY_COUNT; starIndex++)
 		{
@@ -149,7 +157,13 @@ void MM_CupSelect_MenuProc(struct RectMenu *menu)
 			int posX = startX + (trackIndex & 1) * MM_CUP_SELECT_TRACK_X_STEP;
 			int posY = startY + (trackIndex >> 1) * MM_CUP_SELECT_TRACK_Y_STEP;
 
-			// Draw Icon of each track
+			// Draw Icon of each track (CustomCups: names instead, while this cup is edited)
+#ifdef CTR_NATIVE
+			if (NativeMods_CustomCupsHideIcons(cupIndex))
+			{
+				continue;
+			}
+#endif
 			RECTMENU_DrawPolyGT4(gGT->ptrIcons[data.ArcadeCups[cupIndex].CupTrack[trackIndex].iconID], posX, posY, &gGT->backBuffer->primMem,
 			                     gGT->pushBuffer_UI.ptrOT, D230.cupSel_Color.self, D230.cupSel_Color.self, D230.cupSel_Color.self, D230.cupSel_Color.self, 0,
 			                     FP(0.5));

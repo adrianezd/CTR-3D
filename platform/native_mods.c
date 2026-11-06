@@ -13,6 +13,14 @@ int g_modBlueFlag = 1;
 int g_modPaintJobs = 1;
 int g_modKartTextures = 1;
 
+/* Adventure mods and the CTR Unlimited-style modes change how the game plays, so they start off. */
+int g_modAdvRandom = 0;
+int g_modAdvDifficulty = 0; /* 0 classic (retail rubber band), 1 easy, 2 medium, 3 hard, 4 super hard, 5 ultra hard */
+int g_modMirror = 0;
+int g_modMoonGravity = 0;
+int g_modItemChaos = 0;
+int g_modIcy = 0;
+
 #define MOD_LANGS 6
 #define MOD_CHARACTERS 16
 #define MOD_ENGINE_CLASSES 5
@@ -529,17 +537,421 @@ int NativeMods_FlagStyle(int style)
 	return ((style == 0) && g_modBlueFlag) ? 3 : style;
 }
 
+/* ------------------------------------------------- EngineSelect (adventure) --- */
+
+/* Adventure garage, after the first Cross: Up/Down cycle the class of the highlighted character
+ * (the stat bars follow engineID), the second Cross goes on to the name entry as in retail. */
+b32 NativeMods_GarageEngineInput(s32 characterID, u32 tap)
+{
+	s32 engine;
+
+	if (!g_modEngineSelect || ((tap & (BTN_UP | BTN_DOWN)) == 0))
+	{
+		return false;
+	}
+
+	engine = NativeMods_EngineOf(characterID);
+	engine = (tap & BTN_DOWN) ? (engine + MOD_ENGINE_CLASSES - 1) % MOD_ENGINE_CLASSES : (engine + 1) % MOD_ENGINE_CLASSES;
+	NativeMods_EngineSet(characterID, engine);
+	OtherFX_Play(0, 1);
+	return true;
+}
+
+char *NativeMods_EngineName(s32 characterID)
+{
+	return (char *)s_modEngineNames[NativeMods_Lang()][NativeMods_EngineOf(characterID)];
+}
+
+/* ----------------------------------------------------------- AdvDifficulty --- */
+
+/* Replaces the adventure rubber band (max difficulty minus times lost) with a fixed level, the
+ * way the mod patched BOTS_Adv_AdjustDifficulty; boss races take twice the value, as there. */
+s32 NativeMods_AdvDifficulty(s32 computed, b32 boss)
+{
+	s32 value;
+
+	switch (g_modAdvDifficulty)
+	{
+	case 1:
+	case 2:
+	case 3:
+		value = D230.cupDifficulty.speed[g_modAdvDifficulty - 1];
+		break;
+	case 4:
+		value = 0x140;
+		break;
+	case 5:
+		value = 0x280;
+		break;
+	default:
+		return computed;
+	}
+	return boss ? (value * 2) : value;
+}
+
+/* ----------------------------------------------------------- AdvRandomizer --- */
+
+/* Which track sits behind each warp pad, shuffled inside its own kind (the 16 trophy tracks,
+ * Slide Coliseum and Turbo Track, the four crystal-challenge arenas, the five gem cups), and which
+ * boss waits in each of the four hub garages. The retail mod reshuffled on every new game and did
+ * not save the result; here the seed lives in <base dir>/advrandom.cfg, so a playthrough keeps its
+ * layout across launches. Delete the file for a new one. */
+#define MOD_ADV_SEED_FILE "advrandom.cfg"
+
+static s16 s_advPad[24];
+static s16 s_advCup[5];
+static s16 s_advHub[5];
+static b32 s_advReady;
+
+static u32 NativeMods_AdvNext(u32 *state)
+{
+	*state = (*state * 1103515245u) + 12345u;
+	return (*state >> 16) & 0x7fff;
+}
+
+static void NativeMods_AdvShuffle(s16 *table, const s16 *slots, s32 count, u32 *state)
+{
+	for (s32 i = count - 1; i > 0; i--)
+	{
+		s32 j = (s32)(NativeMods_AdvNext(state) % (u32)(i + 1));
+		s16 tmp = table[slots[i]];
+		table[slots[i]] = table[slots[j]];
+		table[slots[j]] = tmp;
+	}
+}
+
+static u32 NativeMods_AdvSeed(void)
+{
+	char path[1024];
+	FILE *file;
+	unsigned int seed = 0;
+
+	if (!NativePath_Join(path, sizeof(path), NativeStr8_FromCString(NativeAssets_GetBaseDir()), NATIVE_STR8_LIT(MOD_ADV_SEED_FILE)))
+	{
+		return 0x1234567u;
+	}
+
+	file = fopen(path, "rb");
+	if (file != NULL)
+	{
+		if (fscanf(file, "%u", &seed) != 1)
+		{
+			seed = 0;
+		}
+		fclose(file);
+	}
+
+	if (seed == 0)
+	{
+		MixRNG_Scramble();
+		seed = ((u32)Timer_GetTime_Total() * 2654435761u) ^ (u32)sdata->randomNumber ^ (u32)sdata->frameCounter;
+		if (seed == 0)
+		{
+			seed = 1;
+		}
+
+		file = fopen(path, "wb");
+		if (file != NULL)
+		{
+			fprintf(file, "%u\n", seed);
+			fclose(file);
+		}
+	}
+	return seed;
+}
+
+static void NativeMods_AdvBuild(void)
+{
+	static const s16 races[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+	static const s16 bonus[2] = {16, 17};
+	static const s16 arenas[4] = {18, 19, 21, 23};
+	static const s16 cups[5] = {0, 1, 2, 3, 4};
+	static const s16 hubs[4] = {1, 2, 3, 4};
+	u32 state;
+
+	if (s_advReady)
+	{
+		return;
+	}
+
+	state = NativeMods_AdvSeed();
+
+	for (s32 i = 0; i < 24; i++)
+	{
+		s_advPad[i] = (s16)i;
+	}
+	for (s32 i = 0; i < 5; i++)
+	{
+		s_advCup[i] = (s16)(ADVENTURE_CUP_SYNTHETIC_LEVEL_ID_BASE + i);
+		s_advHub[i] = (s16)i;
+	}
+
+	NativeMods_AdvShuffle(s_advPad, races, 16, &state);
+	NativeMods_AdvShuffle(s_advPad, bonus, 2, &state);
+	NativeMods_AdvShuffle(s_advPad, arenas, 4, &state);
+	NativeMods_AdvShuffle(s_advCup, cups, 5, &state);
+	NativeMods_AdvShuffle(s_advHub, hubs, 4, &state);
+	s_advReady = true;
+}
+
+s32 NativeMods_AdvRandomPad(s32 levelID)
+{
+	if (!g_modAdvRandom)
+	{
+		return levelID;
+	}
+
+	NativeMods_AdvBuild();
+
+	if ((levelID >= 0) && (levelID < 24))
+	{
+		return s_advPad[levelID];
+	}
+	if ((levelID >= ADVENTURE_CUP_SYNTHETIC_LEVEL_ID_BASE) && (levelID < ADVENTURE_CUP_SYNTHETIC_LEVEL_ID_BASE + 5))
+	{
+		return s_advCup[levelID - ADVENTURE_CUP_SYNTHETIC_LEVEL_ID_BASE];
+	}
+	return levelID;
+}
+
+s32 NativeMods_AdvRandomHub(s32 hubID)
+{
+	if (!g_modAdvRandom || (hubID < 0) || (hubID > 4))
+	{
+		return hubID;
+	}
+
+	NativeMods_AdvBuild();
+	return s_advHub[hubID];
+}
+
+/* ---------------------------------------------------- CTR Unlimited modes --- */
+
+/* Mirror mode: the top screen is flipped at the display transfer (n3ds_backend.c, which also
+ * swaps the per-eye disparity so stereo depth survives the flip) and steering is swapped here.
+ * Only while racing: menus, pause and results stay readable. */
+#ifdef __3DS__
+extern int g_n3dsMirrorTop;
+#endif
+
+b32 NativeMods_MirrorActive(void)
+{
+	struct GameTracker *gGT = sdata->gGT;
+
+	return g_modMirror && (gGT != NULL) && ((gGT->gameMode1 & (MAIN_MENU | PAUSE_ALL | LOADING | GAME_CUTSCENE | END_OF_RACE)) == 0);
+}
+
+u32 NativeMods_MirrorButtons(u32 buttons)
+{
+	u32 lr = buttons & (BTN_LEFT | BTN_RIGHT);
+
+	if ((lr == 0) || (lr == (BTN_LEFT | BTN_RIGHT)))
+	{
+		return buttons;
+	}
+	return (buttons & ~(u32)(BTN_LEFT | BTN_RIGHT)) | ((lr == BTN_LEFT) ? BTN_RIGHT : BTN_LEFT);
+}
+
+/* Moon gravity: 40% of every kart's gravity (karts are born per race, so it applies next race). */
+void NativeMods_DriverConsts(struct Driver *driver)
+{
+	if (g_modMoonGravity)
+	{
+		driver->const_Gravity = (s16)((driver->const_Gravity * 2) / 5);
+	}
+}
+
+/* Item chaos: any weapon from any box, whatever your place (not in battle or boss races). */
+void NativeMods_ChaosItem(struct Driver *driver)
+{
+	static const u8 pool[] = {HELD_ITEM_TURBO,   HELD_ITEM_BOMB_1X,  HELD_ITEM_MISSILE_1X, HELD_ITEM_TNT,         HELD_ITEM_POTION,
+	                          HELD_ITEM_SHIELD,  HELD_ITEM_MASK,     HELD_ITEM_CLOCK,      HELD_ITEM_WARPBALL,    HELD_ITEM_BOMB_3X,
+	                          HELD_ITEM_MISSILE_3X, HELD_ITEM_INVISIBILITY, HELD_ITEM_SUPER_ENGINE};
+	struct GameTracker *gGT = sdata->gGT;
+
+	if (!g_modItemChaos || (gGT->gameMode1 & (BATTLE_MODE | ADVENTURE_BOSS)))
+	{
+		return;
+	}
+
+	MixRNG_Scramble();
+	driver->heldItemID = pool[((u32)sdata->randomNumber >> 8) % (u32)sizeof(pool)];
+}
+
+/* Icy tracks: retail's SLEDROAD cheat flag, kept in step with the toggle. */
+static void NativeMods_SyncFlags(void)
+{
+	static int s_icyWas;
+	struct GameTracker *gGT = sdata->gGT;
+
+	if (gGT == NULL)
+	{
+		return;
+	}
+	if (g_modIcy)
+	{
+		gGT->gameMode2 |= CHEAT_ICY;
+	}
+	else if (s_icyWas)
+	{
+		gGT->gameMode2 &= ~CHEAT_ICY;
+	}
+	s_icyWas = g_modIcy;
+}
+
+/* ------------------------------------------------------------- CustomCups --- */
+
+/* Arcade cup screen: SELECT edits the highlighted cup, Up/Down pick one of its four races,
+ * Left/Right change the track, R fills the cup at random. Picks index the 18 arcade tracks of
+ * the track-select list, as in the original mod. */
+static const char *const s_modCupHint[MOD_LANGS] = {"SELECT: CUSTOM CUP", "SELECT: COUPE PERSO", "SELECT: EIGENER CUP",
+                                                    "SELECT: COPPA LIBERA", "SELECT: COPA A MEDIDA", "SELECT: EIGEN BEKER"};
+static const char *const s_modCupKeys[MOD_LANGS] = {"D-PAD: TRACK   R: RANDOM", "CROIX: PISTE   R: HASARD", "KREUZ: STRECKE   R: ZUFALL",
+                                                    "CROCE: PISTA   R: CASUALE", "CRUCETA: PISTA   R: AZAR", "PIJLEN: BAAN   R: WILLEKEURIG"};
+
+#define MOD_CUP_TRACKS 18
+
+static s8 s_cupPick[4][4];
+static b32 s_cupReady;
+static b32 s_cupEditing;
+static s8 s_cupEdit;
+static s8 s_cupRow;
+
+static void NativeMods_CupApply(s32 cup)
+{
+	for (s32 i = 0; i < 4; i++)
+	{
+		const struct MainMenu_LevelRow *row = &D230.arcadeTracks[s_cupPick[cup][i]];
+
+		data.ArcadeCups[cup].CupTrack[i].trackID = row->levID;
+		data.ArcadeCups[cup].CupTrack[i].iconID = row->videoThumbnail;
+	}
+}
+
+void NativeMods_CustomCupsFrame(struct RectMenu *menu)
+{
+	u32 tap = sdata->gGamepads->gamepad[0].buttonsTapped;
+
+	if (!s_cupReady)
+	{
+		for (s32 cup = 0; cup < 4; cup++)
+		{
+			for (s32 i = 0; i < 4; i++)
+			{
+				s_cupPick[cup][i] = 0;
+				for (s32 t = 0; t < MOD_CUP_TRACKS; t++)
+				{
+					if (D230.arcadeTracks[t].levID == data.ArcadeCups[cup].CupTrack[i].trackID)
+					{
+						s_cupPick[cup][i] = (s8)t;
+						break;
+					}
+				}
+			}
+		}
+		s_cupReady = true;
+	}
+
+	DecalFont_DrawLine((char *)s_modCupHint[NativeMods_Lang()], 0x100, 0x4, FONT_SMALL, (JUSTIFY_CENTER | ORANGE));
+
+	if (D230.cupSelectTransition.state != IN_MENU)
+	{
+		return;
+	}
+
+	if (tap & BTN_SELECT)
+	{
+		s_cupEditing = !s_cupEditing;
+		s_cupEdit = (s8)(menu->rowSelected & 3);
+		s_cupRow = 0;
+	}
+
+	if (!s_cupEditing)
+	{
+		return;
+	}
+
+	menu->rowSelected = s_cupEdit;
+
+	if (tap & BTN_UP)
+	{
+		s_cupRow = (s8)((s_cupRow + 3) & 3);
+	}
+	if (tap & BTN_DOWN)
+	{
+		s_cupRow = (s8)((s_cupRow + 1) & 3);
+	}
+	if (tap & BTN_LEFT)
+	{
+		s_cupPick[s_cupEdit][s_cupRow] = (s8)((s_cupPick[s_cupEdit][s_cupRow] + MOD_CUP_TRACKS - 1) % MOD_CUP_TRACKS);
+	}
+	if (tap & BTN_RIGHT)
+	{
+		s_cupPick[s_cupEdit][s_cupRow] = (s8)((s_cupPick[s_cupEdit][s_cupRow] + 1) % MOD_CUP_TRACKS);
+	}
+	if (tap & BTN_R1)
+	{
+		for (s32 i = 0; i < 4;)
+		{
+			MixRNG_Scramble();
+			s32 id = (s32)((((u32)Timer_GetTime_Total() & 0xf) + ((u32)sdata->randomNumber >> 8)) % MOD_CUP_TRACKS);
+			b32 taken = false;
+
+			for (s32 j = 0; j < i; j++)
+			{
+				if (s_cupPick[s_cupEdit][j] == id)
+				{
+					taken = true;
+				}
+			}
+			if (!taken)
+			{
+				s_cupPick[s_cupEdit][i++] = (s8)id;
+			}
+		}
+	}
+
+	NativeMods_CupApply(s_cupEdit);
+	DecalFont_DrawLine((char *)s_modCupKeys[NativeMods_Lang()], 0x100, 0xcc, FONT_SMALL, (JUSTIFY_CENTER | ORANGE));
+}
+
+/* While a cup is being edited, its window lists the four track names instead of their icons. */
+b32 NativeMods_CustomCupsHideIcons(s32 cup)
+{
+	return s_cupEditing && (cup == s_cupEdit);
+}
+
+void NativeMods_CustomCupsDraw(s32 cup, s32 x, s32 y)
+{
+	if (!NativeMods_CustomCupsHideIcons(cup))
+	{
+		return;
+	}
+
+	for (s32 i = 0; i < 4; i++)
+	{
+		s32 levID = D230.arcadeTracks[s_cupPick[cup][i]].levID;
+
+		DecalFont_DrawLine(sdata->lngStrings[data.metaDataLEV[levID].name_LNG], x, y + i * 10, FONT_SMALL, (i == s_cupRow) ? WHITE : ORANGE);
+	}
+}
+
 /* -------------------------------------------------------------------- hooks --- */
 
 void NativeMods_Frame(void)
 {
 	NativeMods_BlueFireFrame();
+	NativeMods_SyncFlags();
+#ifdef __3DS__
+	g_n3dsMirrorTop = NativeMods_MirrorActive() ? 1 : 0;
+#endif
 }
 
 void NativeMods_OnVramLoaded(void)
 {
 	/* a reload put the retail fire palette back */
 	s_fireIsBlue = false;
+	NativeMods_SyncFlags();
 
 	if (g_modKartTextures)
 	{

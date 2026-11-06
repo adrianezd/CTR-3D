@@ -179,7 +179,14 @@ void CS_Garage_MenuProc(struct RectMenu *menu)
 
 	u16 statBarShadows_Y = GARAGE_STAT_BAR_SHADOW_Y;
 
-	// Draw class name
+	// Draw class name (EngineSelect: the picked class once the character is selected)
+#ifdef CTR_NATIVE
+	if (NativeMods_EngineSelectActive() && (gGarage.boolSelected == 1))
+	{
+		DecalFont_DrawLine(NativeMods_EngineName(currCharacterID), classNamePosX, GARAGE_CLASS_NAME_Y, FONT_BIG, (JUSTIFY_CENTER | ORANGE));
+	}
+	else
+#endif
 	DecalFont_DrawLine(sdata->lngStrings[gGarage.classStringIDs[classStringIndex]], classNamePosX, GARAGE_CLASS_NAME_Y, FONT_BIG, (JUSTIFY_CENTER | ORANGE));
 
 	// bar length (animated)
@@ -321,6 +328,18 @@ void CS_Garage_MenuProc(struct RectMenu *menu)
 	}
 
 	garageFrames = gGarage.numFramesCurr_GarageMove;
+
+#ifdef CTR_NATIVE
+	// EngineSelect: Up/Down change the class while the character is selected
+	if (NativeMods_EngineSelectActive() && (gGarage.boolSelected == 1) && ((gGT->renderFlags & RENDER_FLAG_CHECKERED_FLAG) == 0) &&
+	    NativeMods_GarageEngineInput(currCharacterID, sdata->AnyPlayerTap))
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			gGarage.statBarLengths[i] = 0;
+		}
+	}
+#endif
 
 	if (((gGT->renderFlags & RENDER_FLAG_CHECKERED_FLAG) != 0) ||
 	    (((sdata->AnyPlayerTap & GARAGE_INPUT_MENU) == 0) && ((sdata->AnyPlayerHold & GARAGE_INPUT_HORIZONTAL) == 0)))
@@ -465,7 +484,12 @@ update_garage_camera:
 	}
 
 	// if pressed X once, and waited for countdown clock
+	// (EngineSelect: no timeout, the second Cross confirms the class)
+#ifdef CTR_NATIVE
+	if ((gGarage.boolSelected == 1) && (gGarage.numFramesCurr_ZoomIn == 0) && !NativeMods_EngineSelectActive())
+#else
 	if ((gGarage.boolSelected == 1) && (gGarage.numFramesCurr_ZoomIn == 0))
+#endif
 	{
 		if (
 		    // frames remaining for animation

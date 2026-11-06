@@ -259,7 +259,11 @@ void BOTS_Adv_AdjustDifficulty(void)
 			}
 		}
 
+#ifdef CTR_NATIVE
+		currDifficulty = NativeMods_AdvDifficulty(maxDifficulty - lostModifier, false);
+#else
 		currDifficulty = maxDifficulty - lostModifier;
+#endif
 		cupDifficulty = (s16)(currDifficulty + BOTS_DIFFICULTY_CUP_OFFSET);
 	}
 	else if ((gameMode1 & ADVENTURE_BOSS) != 0)
@@ -274,7 +278,11 @@ void BOTS_Adv_AdjustDifficulty(void)
 			lostModifier = BOTS_Adv_NumTimesLostEvent(sdata->advProgress.timesLostBossRace[bossID]) - BOTS_ADV_HIGH_TIER_CHEAT_LOSS_BASE;
 		}
 
+#ifdef CTR_NATIVE
+		currDifficulty = NativeMods_AdvDifficulty(maxDifficulty - lostModifier, true);
+#else
 		currDifficulty = maxDifficulty - lostModifier;
+#endif
 	}
 	else
 	{
@@ -295,7 +303,11 @@ void BOTS_Adv_AdjustDifficulty(void)
 			lostModifier = BOTS_Adv_NumTimesLostEvent(sdata->advProgress.timesLostRacePerLev[gGT->levelID]) - BOTS_ADV_RACE_CHEAT_LOSS_BASE;
 		}
 
+#ifdef CTR_NATIVE
+		currDifficulty = NativeMods_AdvDifficulty(maxDifficulty - lostModifier, false);
+#else
 		currDifficulty = maxDifficulty - lostModifier;
+#endif
 	}
 
 	if ((s16)currDifficulty < 0)

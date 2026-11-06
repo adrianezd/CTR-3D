@@ -25,6 +25,12 @@ extern int g_modBlueFire;
 extern int g_modBlueFlag;
 extern int g_modPaintJobs;
 extern int g_modKartTextures;
+extern int g_modAdvRandom;
+extern int g_modAdvDifficulty;
+extern int g_modMirror;
+extern int g_modMoonGravity;
+extern int g_modItemChaos;
+extern int g_modIcy;
 
 /* language index of the OPTIONS table (0 English ... 4 Spanish, 5 Dutch); 0 on PC */
 s32 NativeOptions_LanguageIndex(void);
@@ -60,6 +66,26 @@ struct Model *NativeMods_FindRivalModel(char *searchName);
 
 /* CustomFlag: game/RaceFlag.c (3 = blue checkers) */
 int NativeMods_FlagStyle(int style);
+
+/* EngineSelect in the adventure garage: game/233/CS_Garage.c */
+b32 NativeMods_GarageEngineInput(s32 characterID, u32 tap);
+char *NativeMods_EngineName(s32 characterID);
+
+/* AdvDifficulty: game/BOTS.c; AdvRandomizer: game/232/AH_WarpPad.c, AH_Garage.c */
+s32 NativeMods_AdvDifficulty(s32 computed, b32 boss);
+s32 NativeMods_AdvRandomPad(s32 levelID);
+s32 NativeMods_AdvRandomHub(s32 hubID);
+
+/* CTR Unlimited-style modes: game/GAMEPAD.c, Vehicle/VehBirth.c, Vehicle/VehPhysGeneral.c */
+b32 NativeMods_MirrorActive(void);
+u32 NativeMods_MirrorButtons(u32 buttons);
+void NativeMods_DriverConsts(struct Driver *driver);
+void NativeMods_ChaosItem(struct Driver *driver);
+
+/* CustomCups: game/230/MM_CupSelect.c */
+void NativeMods_CustomCupsFrame(struct RectMenu *menu);
+b32 NativeMods_CustomCupsHideIcons(s32 cup);
+void NativeMods_CustomCupsDraw(s32 cup, s32 x, s32 y);
 
 #endif /* CTR_NATIVE */
 

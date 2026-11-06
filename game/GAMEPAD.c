@@ -340,6 +340,14 @@ int GAMEPAD_ProcessHold(struct GamepadSystem *gGamepads)
 				}
 			}
 
+#ifdef CTR_NATIVE
+			// Mirror mode: left and right swap while racing
+			if ((pad == &gGamepads->gamepad[0]) && NativeMods_MirrorActive())
+			{
+				mappedButtons = NativeMods_MirrorButtons(mappedButtons);
+			}
+#endif
+
 			// record buttons held this frame
 			pad->buttonsHeldCurrFrame = mappedButtons;
 			heldAny |= mappedButtons;
@@ -525,6 +533,12 @@ void GAMEPAD_ProcessSticks(struct GamepadSystem *gGamepads)
 			if ((controllerData == ((PAD_ID_ANALOG_STICK << 4) | 3)) || (controllerData == ((PAD_ID_ANALOG << 4) | 3)))
 			{
 				pad->stickLX_dontUse1 = packet->analog.leftX;
+#ifdef CTR_NATIVE
+				if ((i == 0) && NativeMods_MirrorActive())
+				{
+					pad->stickLX_dontUse1 = 0xff - pad->stickLX_dontUse1;
+				}
+#endif
 
 				if (packet->analog.leftY == 0xff && pad->unk_1 != 0xff)
 				{

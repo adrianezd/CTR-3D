@@ -1258,6 +1258,12 @@ int N3DS_CopyDisplayedTopFrame(unsigned char *dstRGB, int dstW, int dstH)
 	 GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) |          \
 	 GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
+/* Mirror mode (platform/native_mods.c): 1 flips the top screen left-right. Written by the game
+ * thread, applied at the next frame begin (N3DS_ApplyTopMirror). GX_TRANSFER_FLIP_VERT flips the
+ * 400-pixel axis of the rotated framebuffer, which is the screen's horizontal. */
+int g_n3dsMirrorTop = 0;
+static int s_mirrorApplied = 0;
+
 static DVLB_s *s_shaderDvlb = NULL;
 static shaderProgram_s s_shaderProgram;
 static int s_uLocProjection = -1;
@@ -1807,7 +1813,8 @@ static void N3DS_StereoLatchFrame(void)
 		s_uiShiftPsx = (float)uiPx * s_uiPsxPerPx; /* before the eye vectors: they clamp the world to it */
 		for (eye = 0; eye < 2; eye++)
 		{
-			const float k = (eye == 1) ? mag : -mag;
+			/* mirrored frames: each eye takes the other's disparity, so depth is right after the flip */
+			const float k = ((eye == 1) != (s_mirrorApplied != 0)) ? mag : -mag;
 
 			N3DS_StereoEyeVec(k, s_stereoVecWorld[eye]);
 			N3DS_StereoEyeVec(pktLive ? k : 0.0f, s_stereoVecPkt[eye]);
@@ -1822,7 +1829,7 @@ static void N3DS_StereoLatchFrame(void)
 			 * sign. Rides the packet vector's liveness so UI never pops out on a
 			 * frame where packet depth is off and the band test is meaningless.
 			 */
-			s_stereoVecUi[eye][0] = pktLive ? ((eye == 1) ? -s_uiShiftPsx : s_uiShiftPsx) : 0.0f;
+			s_stereoVecUi[eye][0] = pktLive ? (((eye == 1) != (s_mirrorApplied != 0)) ? -s_uiShiftPsx : s_uiShiftPsx) : 0.0f;
 			s_stereoVecUi[eye][1] = 0.0f;
 			s_stereoVecUi[eye][2] = 0.0f;
 			s_stereoVecUi[eye][3] = 0.0f;
@@ -3035,6 +3042,24 @@ void N3DS_C3DNoteDrawOutsideFrame(const char *site)
 	}
 }
 
+static void N3DS_ApplyTopMirror(void)
+{
+	const int want = g_n3dsMirrorTop ? 1 : 0;
+	const u32 flags = N3DS_DISPLAY_TRANSFER_FLAGS | (want ? GX_TRANSFER_FLIP_VERT(1) : 0);
+
+	if ((want == s_mirrorApplied) || (s_renderTarget == NULL))
+	{
+		return;
+	}
+
+	C3D_RenderTargetSetOutput(s_renderTarget, GFX_TOP, GFX_LEFT, flags);
+	if (s_renderTargetRight != NULL)
+	{
+		C3D_RenderTargetSetOutput(s_renderTargetRight, GFX_TOP, GFX_RIGHT, flags);
+	}
+	s_mirrorApplied = want;
+}
+
 void N3DS_C3DBeginFrame(void)
 {
 	/* Latch the physical 3D slider for the whole frame BEFORE anything is
@@ -3044,6 +3069,7 @@ void N3DS_C3DBeginFrame(void)
 	 * wait rather than inside the frame bracket. */
 	const unsigned long long endProfT = N3DS_EndProfNow();
 
+	N3DS_ApplyTopMirror();
 	N3DS_StereoLatchFrame();
 
 	N3DS_FrameTrace("[CTR-3DS] FrameBegin: enter (SYNCDRAW wait)");

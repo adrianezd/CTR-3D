@@ -39,7 +39,7 @@ static inline void NativePenta_ApplyPalClass(struct Driver *driver)
  * would silence the kart, not change its note. */
 static inline s16 NativePenta_StatBarLength(s16 retailLen, struct MetaDataCHAR *mdc)
 {
-	if (g_pentaPal && (mdc == &data.MetaDataCharacters[PENTA_PENGUIN]))
+	if (NativeMods_WantsUnlimitedClass((s32)(mdc - &data.MetaDataCharacters[0])))
 	{
 		return 0x50;
 	}
