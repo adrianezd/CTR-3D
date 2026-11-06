@@ -2,11 +2,12 @@ name: Symbolize crash
 
 # Rebuilds the production configuration and maps crash addresses to functions.
 on:
-  workflow_dispatch:
-    inputs:
-      addrs:
-        description: 'Addresses (hex, space separated)'
-        required: true
+  push:
+    branches:
+      - sym
+
+env:
+  ADDRS: "0x00115C2C 0x00119F38"
 
 jobs:
   symbolize:
@@ -30,12 +31,12 @@ jobs:
           ./build3ds.sh --release --no-cia > /dev/null
           ELF=$(find build-3ds-release -maxdepth 2 -name '*.elf' | head -1)
           echo "ELF: $ELF"
-          for a in ${{ inputs.addrs }}; do
+          for a in $ADDRS; do
             echo "== $a"
             $DEVKITARM/bin/arm-none-eabi-addr2line -f -i -C -e "$ELF" $a
           done
           echo "== disassembly around the first address"
-          FIRST=$(echo ${{ inputs.addrs }} | cut -d' ' -f1)
+          FIRST=$(echo $ADDRS | cut -d' ' -f1)
           START=$(printf '0x%x' $(( FIRST - 0x40 )))
           STOP=$(printf '0x%x' $(( FIRST + 0x20 )))
           $DEVKITARM/bin/arm-none-eabi-objdump -d -l --start-address=$START --stop-address=$STOP "$ELF" | tail -60
