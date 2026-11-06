@@ -1,5 +1,7 @@
 # CTR 3D
 
+> **Not my code.** This is an unofficial fork of [tinaut1986/CTR-3D](https://github.com/tinaut1986/CTR-3D), which is all tinaut1986's work (on top of [zando95/CTR-3D](https://github.com/zando95/CTR-3D) and [CTR Native](https://github.com/CTR-tools/ctr-native)). The only addition here, on the `feat/idiomas-oxide` branch, is two changes by [LopezTutoriales](https://github.com/LopezTutoriales/CTR-3D) carried over unchanged: language selection with PAL voices, and Nitros Oxide unlockable with the SOAR cheat. Those parts use code and data from the PS Vita port by Rinnegatamante ([Crash-Team-Racing-High-Octane](https://github.com/Rinnegatamante/Crash-Team-Racing-High-Octane), GPL-3.0). For the official version, bug reports and updates, go to [tinaut1986/CTR-3D](https://github.com/tinaut1986/CTR-3D).
+
 A Nintendo 3DS homebrew port of Crash Team Racing (PS1, 1999), for the New 3DS and, since v0.1.0, the Old 3DS and 2DS too.
 
 This is a fork of [CTR Native](https://github.com/CTR-tools/ctr-native), the native PC port of the game built on the [CTR-ModSDK](https://github.com/CTR-tools/CTR-ModSDK) decompilation. The 3DS platform layer and the renderer for the 3DS GPU come from [zando95/CTR-3D](https://github.com/zando95/CTR-3D), which first brought the game to the New 3DS. This fork adds Old 3DS / 2DS support, races unlocked to 60 FPS, the race HUD on the bottom screen, reworked stereoscopic 3D and an in-game updater.
