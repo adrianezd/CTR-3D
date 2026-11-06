@@ -269,6 +269,17 @@ static b32 NativeMods_RandomRivalsAllowed(void)
 	       (gGT->numPlyrCurrGame == 1);
 }
 
+#define MOD_RIVALS_OUTSIDE_PACK 4
+
+/* The player's 1P arcade pack carries the CPUs LOAD_Robots1P would pick: the first seven
+ * characters, skipping the player. */
+static b32 NativeMods_InPlayerPack(s32 playerCharacterID, s32 characterID)
+{
+	s32 slot = (characterID < playerCharacterID) ? characterID : (characterID - 1);
+
+	return (characterID != playerCharacterID) && (slot < 7);
+}
+
 /* LOAD_Robots1P replacement. Returns false to let retail fill the standard CPU set. */
 b32 NativeMods_RandomizeRivals(s32 playerCharacterID)
 {
@@ -290,6 +301,8 @@ b32 NativeMods_RandomizeRivals(s32 playerCharacterID)
 		return true;
 	}
 
+	s32 outsidePack = 0;
+
 	for (s32 i = 1; i < 8;)
 	{
 		MixRNG_Scramble();
@@ -305,6 +318,19 @@ b32 NativeMods_RandomizeRivals(s32 playerCharacterID)
 			}
 		}
 
+		/* memory: at most MOD_RIVALS_OUTSIDE_PACK drivers that the player's pack does not carry */
+		if (!taken && !NativeMods_InPlayerPack(playerCharacterID, id))
+		{
+			if (outsidePack >= MOD_RIVALS_OUTSIDE_PACK)
+			{
+				taken = true;
+			}
+			else
+			{
+				outsidePack++;
+			}
+		}
+
 		if (!taken)
 		{
 			data.characterIDs[i++] = (s16)id;
@@ -313,24 +339,29 @@ b32 NativeMods_RandomizeRivals(s32 playerCharacterID)
 	return true;
 }
 
-/* Replaces the 1P arcade pack for a randomized race. The load queue holds eight files: the
- * player's and six CPUs' high-LOD models, plus the 4P pack of the last CPU, which brings that
- * driver's model and every weapon model. Smaller than the retail 1P pack it replaces. */
+/* A randomized race keeps the player's retail 1P arcade pack: it carries the player, the seven
+ * CPUs retail would pick, every weapon model and the 1P HUD icons (the 4P pack the retail mod used
+ * brings the 4P icon set, and the 1P HUD then draws from icon groups that are not there -- a
+ * data abort at the first race). CPUs the pack does not carry are loaded one by one, low LOD,
+ * at most MOD_RIVALS_OUTSIDE_PACK of them, so the load stays within a few dozen KB of retail's. */
 b32 NativeMods_QueueRivalModels(struct BigHeader *bigfile, void (*callback)(struct LoadQueueSlot *))
 {
+	s32 player = data.characterIDs[0];
+
 	if (!s_rivalsRandom || !NativeMods_RandomRivalsAllowed())
 	{
 		return false;
 	}
 
-	LOAD_AppendQueue(bigfile, LT_GETADDR, BI_RACERMODELHI + data.characterIDs[0], &data.driverModelExtras[0].fileBase, LOAD_QUEUE_CALLBACK_SET_POINTER);
-
-	for (s32 i = 1; i < 7; i++)
+	for (s32 i = 1; i < 8; i++)
 	{
-		LOAD_AppendQueue(bigfile, LT_GETADDR, BI_RACERMODELHI + data.characterIDs[i], &s_rivalModels[i].fileBase, LOAD_QUEUE_CALLBACK_SET_POINTER);
+		if (!NativeMods_InPlayerPack(player, data.characterIDs[i]))
+		{
+			LOAD_AppendQueue(bigfile, LT_GETADDR, BI_RACERMODELLOW + data.characterIDs[i], &s_rivalModels[i].fileBase, LOAD_QUEUE_CALLBACK_SET_POINTER);
+		}
 	}
 
-	LOAD_AppendQueue(bigfile, LT_GETADDR, BI_4PARCADEPACK + data.characterIDs[7], NULL, callback);
+	LOAD_AppendQueue(bigfile, LT_GETADDR, BI_1PARCADEPACK + player, NULL, callback);
 	return true;
 }
 
