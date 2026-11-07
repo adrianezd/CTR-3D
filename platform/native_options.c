@@ -70,10 +70,29 @@ static struct NativeOptToggle s_modToggles[] = {
     {LNG_UNUSED_0F9, &g_modMoonGravity, NULL, 12},
     {LNG_UNUSED_0FA, &g_modItemChaos, NULL, 13},
     {LNG_UNUSED_0FB, &g_modIcy, NULL, 14},
+    {LNG_UNUSED_100, &g_modBossRace, NULL, 15},
 };
 #define MOD_TOGGLE_COUNT ((s32)(sizeof(s_modToggles) / sizeof(s_modToggles[0])))
 #define OPT_SLOT_MODS LNG_UNUSED_0F7
 #define OPT_SLOT_ADV_DIFFICULTY LNG_UNUSED_0FF
+#define OPT_SLOT_CHEATS LNG_UNUSED_101
+
+/* The CHEATS submenu (last MODS row): retail cheat codes as toggles, see NativeMods_SyncFlags. */
+static struct NativeOptToggle s_cheatToggles[MOD_CHEAT_COUNT] = {
+    {LNG_UNUSED_102, &g_modCheat[0], NULL, 16},
+    {LNG_UNUSED_103, &g_modCheat[1], NULL, 17},
+    {LNG_UNUSED_104, &g_modCheat[2], NULL, 18},
+    {LNG_UNUSED_10A, &g_modCheat[3], NULL, 19},
+    {LNG_UNUSED_10D, &g_modCheat[4], NULL, 20},
+    {LNG_UNUSED_10E, &g_modCheat[5], NULL, 21},
+    {LNG_UNUSED_113, &g_modCheat[6], NULL, 22},
+    {LNG_UNUSED_114, &g_modCheat[7], NULL, 23},
+    {LNG_UNUSED_115, &g_modCheat[8], NULL, 24},
+};
+#define CHEAT_TOGGLE_COUNT MOD_CHEAT_COUNT
+
+/* highest repointed slot: the string table must reach it */
+#define OPT_SLOT_LAST LNG_UNUSED_115
 #define OPT_ADV_LEVELS 6
 
 /* Language selector: the row right after the toggles (LNG_UNUSED_0E9). Confirm cycles it.
@@ -100,7 +119,7 @@ static const s16 s_optLangFile[OPT_LANG_COUNT] = {1, 3, 4, 5, 6, 7};
  * them here. Language names are written in their own language everywhere else (so you can still
  * find your language in a menu you cannot read), which is why these rows also fit in 18.
  */
-#define OPT_TEXT_TOGGLES 15
+#define OPT_TEXT_TOGGLES 25
 
 struct NativeOptText
 {
@@ -114,12 +133,13 @@ struct NativeOptText
 	const char *modsName;                      /* the OPTIONS row that opens MODS */
 	const char *advName;                       /* label of the adventure difficulty row */
 	const char *advLevels[OPT_ADV_LEVELS];     /* classic, easy, medium, hard, super hard, ultra hard */
+	const char *cheatsName;                    /* the MODS row that opens CHEATS */
 };
 
 static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
     /* English (NTSC-U file 1): unchanged */
     {"OPTIONS",
-     {"PAL PENTA", "RESERVES METER", "BOTTOM MAP", "TEXTURE FILTER", "ENGINE SELECT", "RANDOM RIVALS", "BLUE FIRE", "BLUE FLAG", "PAINT JOBS", "KART TEXTURES", "ADV RANDOMIZER", "MIRROR MODE", "MOON GRAVITY", "ITEM CHAOS", "ICY TRACKS"},
+     {"PAL PENTA", "RESERVES METER", "BOTTOM MAP", "TEXTURE FILTER", "ENGINE SELECT", "RANDOM RIVALS", "BLUE FIRE", "BLUE FLAG", "PAINT JOBS", "KART TEXTURES", "ADV RANDOMIZER", "MIRROR MODE", "MOON GRAVITY", "ITEM CHAOS", "ICY TRACKS", "BOSS RACES", "MAX WUMPA", "INFINITE MASKS", "INFINITE TURBO", "INFINITE BOMBS", "INVISIBILITY", "SUPER ENGINE", "SUPER PADS", "ONE LAP RACE", "TURBO COUNTER"},
      "OFF",
      "ON",
      "LANGUAGE",
@@ -127,10 +147,11 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      9,
      "MODS",
      "ADVENTURE",
-     {"CLASSIC", "EASY", "MEDIUM", "HARD", "SUPER", "ULTRA"}},
+     {"CLASSIC", "EASY", "MEDIUM", "HARD", "SUPER", "ULTRA"},
+     "CHEATS"},
     /* French */
     {"OPTIONS",
-     {"PENTA PAL", "JAUGE RESERVE", "CARTE EN BAS", "FILTRE TEXTURE", "CHOIX MOTEUR", "RIVAUX HASARD", "FEU BLEU", "DRAPEAU BLEU", "PEINTURES", "TEXTURES KART", "AVENT. HASARD", "MODE MIROIR", "GRAVITE LUNE", "CHAOS OBJETS", "PISTES GLACE"},
+     {"PENTA PAL", "JAUGE RESERVE", "CARTE EN BAS", "FILTRE TEXTURE", "CHOIX MOTEUR", "RIVAUX HASARD", "FEU BLEU", "DRAPEAU BLEU", "PEINTURES", "TEXTURES KART", "AVENT. HASARD", "MODE MIROIR", "GRAVITE LUNE", "CHAOS OBJETS", "PISTES GLACE", "COURSES BOSS", "WUMPA MAX", "MASQUES INF.", "TURBOS INF.", "BOMBES INF.", "INVISIBILITE", "SUPER MOTEUR", "SUPER BOOSTS", "UN SEUL TOUR", "COMPTEUR TURBO"},
      "NON",
      "OUI",
      "LANGUE",
@@ -138,10 +159,11 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10,
      "MODS",
      "AVENTURE",
-     {"NORMAL", "FACILE", "MOYEN", "DUR", "SUPER", "ULTRA"}},
+     {"NORMAL", "FACILE", "MOYEN", "DUR", "SUPER", "ULTRA"},
+     "CODES"},
     /* German */
     {"OPTIONEN",
-     {"PAL PENTA", "RESERVEANZEIGE", "KARTE UNTEN", "TEXTURFILTER", "MOTORWAHL", "ZUFALLSGEGNER", "BLAUES FEUER", "BLAUE FLAGGE", "LACKIERUNGEN", "KARTTEXTUREN", "ABENTEUER ZUF.", "SPIEGELMODUS", "MONDGRAVITAT", "ITEM CHAOS", "EISSTRECKEN"},
+     {"PAL PENTA", "RESERVEANZEIGE", "KARTE UNTEN", "TEXTURFILTER", "MOTORWAHL", "ZUFALLSGEGNER", "BLAUES FEUER", "BLAUE FLAGGE", "LACKIERUNGEN", "KARTTEXTUREN", "ABENTEUER ZUF.", "SPIEGELMODUS", "MONDGRAVITAT", "ITEM CHAOS", "EISSTRECKEN", "BOSSRENNEN", "MAX WUMPA", "ENDLOS MASKEN", "ENDLOS TURBOS", "ENDLOS BOMBEN", "UNSICHTBAR", "SUPERMOTOR", "SUPER BOOSTS", "EINE RUNDE", "TURBOZAHLER"},
      "AUS",
      "EIN",
      "SPRACHE",
@@ -149,10 +171,11 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10,
      "MODS",
      "ABENTEUER",
-     {"NORMAL", "LEICHT", "MITTEL", "SCHWER", "SUPER", "ULTRA"}},
+     {"NORMAL", "LEICHT", "MITTEL", "SCHWER", "SUPER", "ULTRA"},
+     "CHEATS"},
     /* Italian */
     {"OPZIONI",
-     {"PENTA PAL", "BARRA RISERVA", "MAPPA IN BASSO", "FILTRO TEXTURE", "SCELTA MOTORE", "RIVALI CASUALI", "FUOCO BLU", "BANDIERA BLU", "VERNICI", "TEXTURE KART", "AVVENT. CASUALE", "MODO SPECCHIO", "GRAVITA LUNARE", "CAOS OGGETTI", "PISTE GHIACCIO"},
+     {"PENTA PAL", "BARRA RISERVA", "MAPPA IN BASSO", "FILTRO TEXTURE", "SCELTA MOTORE", "RIVALI CASUALI", "FUOCO BLU", "BANDIERA BLU", "VERNICI", "TEXTURE KART", "AVVENT. CASUALE", "MODO SPECCHIO", "GRAVITA LUNARE", "CAOS OGGETTI", "PISTE GHIACCIO", "SFIDE BOSS", "WUMPA MAX", "MASCHERE INF.", "TURBO INF.", "BOMBE INF.", "INVISIBILITA", "SUPER MOTORE", "SUPER BOOST", "UN SOLO GIRO", "CONTA TURBO"},
      "NO",
      "SI",
      "LINGUA",
@@ -160,10 +183,11 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10,
      "MODS",
      "AVVENTURA",
-     {"NORMALE", "FACILE", "MEDIA", "DURA", "SUPER", "ULTRA"}},
+     {"NORMALE", "FACILE", "MEDIA", "DURA", "SUPER", "ULTRA"},
+     "TRUCCHI"},
     /* Spanish */
     {"OPCIONES",
-     {"PENTA PAL", "MEDIDOR RESERVA", "MAPA INFERIOR", "FILTRO TEXTURAS", "ELEGIR MOTOR", "RIVALES AZAR", "FUEGO AZUL", "BANDERA AZUL", "PINTURAS", "TEXTURAS KART", "AVENTURA AZAR", "MODO ESPEJO", "GRAVEDAD LUNAR", "CAOS OBJETOS", "PISTAS HIELO"},
+     {"PENTA PAL", "MEDIDOR RESERVA", "MAPA INFERIOR", "FILTRO TEXTURAS", "ELEGIR MOTOR", "RIVALES AZAR", "FUEGO AZUL", "BANDERA AZUL", "PINTURAS", "TEXTURAS KART", "AVENTURA AZAR", "MODO ESPEJO", "GRAVEDAD LUNAR", "CAOS OBJETOS", "PISTAS HIELO", "CONTRA JEFES", "WUMPAS MAXIMAS", "MASCARAS INF.", "TURBOS INF.", "BOMBAS INF.", "INVISIBILIDAD", "SUPER MOTOR", "SUPER TURBOPADS", "UNA VUELTA", "CONTADOR TURBO"},
      "NO",
      "SI",
      "IDIOMA",
@@ -171,10 +195,11 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10,
      "MODS",
      "AVENTURA",
-     {"CLASICA", "FACIL", "MEDIA", "DIFICIL", "SUPER", "ULTRA"}},
+     {"CLASICA", "FACIL", "MEDIA", "DIFICIL", "SUPER", "ULTRA"},
+     "TRUCOS"},
     /* Dutch */
     {"OPTIES",
-     {"PAL PENTA", "RESERVEMETER", "KAART ONDER", "TEXTUURFILTER", "MOTORKEUZE", "RANDOM RIVALEN", "BLAUW VUUR", "BLAUWE VLAG", "LAKKEN", "KARTTEXTUREN", "AVONT. RANDOM", "SPIEGELMODUS", "MAANZWAARTE", "ITEM CHAOS", "IJSBANEN"},
+     {"PAL PENTA", "RESERVEMETER", "KAART ONDER", "TEXTUURFILTER", "MOTORKEUZE", "RANDOM RIVALEN", "BLAUW VUUR", "BLAUWE VLAG", "LAKKEN", "KARTTEXTUREN", "AVONT. RANDOM", "SPIEGELMODUS", "MAANZWAARTE", "ITEM CHAOS", "IJSBANEN", "BAASRACES", "MAX WUMPA", "MASKERS INF.", "TURBOS INF.", "BOMMEN INF.", "ONZICHTBAAR", "SUPERMOTOR", "SUPER BOOSTS", "EEN RONDE", "TURBOTELLER"},
      "UIT",
      "AAN",
      "TAAL",
@@ -182,13 +207,15 @@ static const struct NativeOptText s_optText[OPT_LANG_COUNT] = {
      10,
      "MODS",
      "AVONTUUR",
-     {"NORMAAL", "SIMPEL", "MEDIUM", "ZWAAR", "SUPER", "ULTRA"}},
+     {"NORMAAL", "SIMPEL", "MEDIUM", "ZWAAR", "SUPER", "ULTRA"},
+     "CHEATS"},
 };
 
 /* The label strings the string table points at. RefreshLabels rewrites them in place. */
 #define OPT_LABEL_MAX 48
 static char s_optLabelBuf[OPT_TOGGLE_COUNT + 2][OPT_LABEL_MAX];
-static char s_modLabelBuf[MOD_TOGGLE_COUNT + 1][OPT_LABEL_MAX];
+static char s_modLabelBuf[MOD_TOGGLE_COUNT + 2][OPT_LABEL_MAX];
+static char s_cheatLabelBuf[CHEAT_TOGGLE_COUNT][OPT_LABEL_MAX];
 
 /* Characters that take room on screen: the PAL tilde prefix (0x03) does not. */
 static s32 NativeOptions_VisibleLen(const char *text)
@@ -321,7 +348,8 @@ static void NativeOptions_CycleLanguage(void)
  * Built from s_optToggles by NativeOptions_BuildRows; the terminator is not a valid nav target,
  * so the last real row's down points at itself. */
 static struct MenuRow s_optMenuRows[OPT_TOGGLE_COUNT + 3]; /* toggles, LANGUAGE, MODS, terminator */
-static struct MenuRow s_modMenuRows[MOD_TOGGLE_COUNT + 2]; /* toggles, ADVENTURE, terminator */
+static struct MenuRow s_modMenuRows[MOD_TOGGLE_COUNT + 3]; /* toggles, ADVENTURE, CHEATS, terminator */
+static struct MenuRow s_cheatMenuRows[CHEAT_TOGGLE_COUNT + 1];
 
 static void NativeOptions_FillRows(struct MenuRow *rows, const s16 *slots, s32 count)
 {
@@ -338,7 +366,7 @@ static void NativeOptions_FillRows(struct MenuRow *rows, const s16 *slots, s32 c
 
 static void NativeOptions_BuildRows(void)
 {
-	s16 slots[MOD_TOGGLE_COUNT + OPT_TOGGLE_COUNT + 2];
+	s16 slots[MOD_TOGGLE_COUNT + OPT_TOGGLE_COUNT + CHEAT_TOGGLE_COUNT + 2];
 	s32 n = 0;
 
 	for (s32 i = 0; i < OPT_TOGGLE_COUNT; i++)
@@ -355,7 +383,15 @@ static void NativeOptions_BuildRows(void)
 		slots[n++] = s_modToggles[i].lngSlot;
 	}
 	slots[n++] = OPT_SLOT_ADV_DIFFICULTY;
+	slots[n++] = OPT_SLOT_CHEATS;
 	NativeOptions_FillRows(s_modMenuRows, slots, n);
+
+	n = 0;
+	for (s32 i = 0; i < CHEAT_TOGGLE_COUNT; i++)
+	{
+		slots[n++] = s_cheatToggles[i].lngSlot;
+	}
+	NativeOptions_FillRows(s_cheatMenuRows, slots, n);
 }
 
 static void NativeOptions_RefreshLabels(void)
@@ -364,7 +400,7 @@ static void NativeOptions_RefreshLabels(void)
 	s32 stateWidth = NativeOptions_VisibleLen(text->stateOff);
 
 	/* every slot written below must exist in the loaded language's string table */
-	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0FF))
+	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= OPT_SLOT_LAST))
 	{
 		return;
 	}
@@ -408,7 +444,46 @@ static void NativeOptions_RefreshLabels(void)
 		NativeOptions_Compose(s_modLabelBuf[MOD_TOGGLE_COUNT], OPT_LABEL_MAX, text->advName, text->advLevels[level], width);
 		sdata->lngStrings[OPT_SLOT_ADV_DIFFICULTY] = s_modLabelBuf[MOD_TOGGLE_COUNT];
 	}
+
+	NativeOptions_Compose(s_modLabelBuf[MOD_TOGGLE_COUNT + 1], OPT_LABEL_MAX, text->cheatsName, "", 0);
+	sdata->lngStrings[OPT_SLOT_CHEATS] = s_modLabelBuf[MOD_TOGGLE_COUNT + 1];
+
+	for (s32 i = 0; i < CHEAT_TOGGLE_COUNT; i++)
+	{
+		NativeOptions_Compose(s_cheatLabelBuf[i], OPT_LABEL_MAX, text->toggleName[s_cheatToggles[i].textIndex], *s_cheatToggles[i].flag ? text->stateOn : text->stateOff,
+		                      stateWidth);
+		sdata->lngStrings[s_cheatToggles[i].lngSlot] = s_cheatLabelBuf[i];
+	}
 }
+
+static void NativeOptions_CheatMenuProc(struct RectMenu *menu)
+{
+	if (menu->funcState != RECTMENU_FUNC_STATE_INPUT)
+	{
+		return;
+	}
+
+	s16 row = menu->rowSelected;
+
+	if (row == -1)
+	{
+		menu->ptrPrevBox_InHierarchy->state &= ~(ONLY_DRAW_TITLE | DRAW_NEXT_MENU_IN_HIERARCHY);
+		return;
+	}
+
+	if ((row >= 0) && (row < CHEAT_TOGGLE_COUNT))
+	{
+		*s_cheatToggles[row].flag ^= 1;
+	}
+	NativeOptions_RefreshLabels();
+}
+
+static struct RectMenu s_cheatMenu = {
+    .stringIndexTitle = RECTMENU_STRING_NONE,
+    .state = CENTER_ON_X | USE_SMALL_FONT,
+    .rows = &s_cheatMenuRows[0],
+    .funcPtr = NativeOptions_CheatMenuProc,
+};
 
 static void NativeOptions_ModMenuProc(struct RectMenu *menu)
 {
@@ -432,6 +507,12 @@ static void NativeOptions_ModMenuProc(struct RectMenu *menu)
 	else if (row == MOD_TOGGLE_COUNT)
 	{
 		g_modAdvDifficulty = (g_modAdvDifficulty + 1) % OPT_ADV_LEVELS;
+	}
+	else if (row == MOD_TOGGLE_COUNT + 1)
+	{
+		menu->ptrNextBox_InHierarchy = &s_cheatMenu;
+		menu->state |= (ONLY_DRAW_TITLE | DRAW_NEXT_MENU_IN_HIERARCHY);
+		return;
 	}
 	NativeOptions_RefreshLabels();
 }
@@ -555,7 +636,7 @@ void NativeOptions_InstallStrings(void)
 	NativeMods_InstallStrings();
 
 #ifdef __3DS__
-	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= LNG_UNUSED_0FF))
+	if ((sdata->lngStrings == NULL) || (sdata->numLngStrings <= OPT_SLOT_LAST))
 	{
 		return;
 	}
@@ -564,6 +645,42 @@ void NativeOptions_InstallStrings(void)
 	sdata->lngStrings[LNG_UNUSED_0E4] = (char *)s_optText[s_optLangIndex].title;
 	NativeOptions_RefreshLabels();
 #endif
+}
+
+/* Retail's memory card screens draw nine strings in a row from fixed starts (0xE1, 0xEA, 0xF3, 0xFC,
+ * 0x106, 0x10F), and the slots repointed here sit inside those runs as empty retail lines.
+ * SelectProfile_DrawMemcardMessage skips them, so a save screen never shows a menu label. */
+b32 NativeOptions_IsOwnString(s32 index)
+{
+	if ((index == LNG_UNUSED_0ED) || (index == LNG_UNUSED_0EE))
+	{
+		return true; /* ExtraDifficulty rows, every platform */
+	}
+#ifdef __3DS__
+	if ((index >= LNG_UNUSED_0E4) && (index <= LNG_UNUSED_0E9))
+	{
+		return true;
+	}
+	if ((index == OPT_SLOT_MODS) || (index == OPT_SLOT_ADV_DIFFICULTY) || (index == OPT_SLOT_CHEATS))
+	{
+		return true;
+	}
+	for (s32 i = 0; i < MOD_TOGGLE_COUNT; i++)
+	{
+		if (s_modToggles[i].lngSlot == index)
+		{
+			return true;
+		}
+	}
+	for (s32 i = 0; i < CHEAT_TOGGLE_COUNT; i++)
+	{
+		if (s_cheatToggles[i].lngSlot == index)
+		{
+			return true;
+		}
+	}
+#endif
+	return false;
 }
 
 s32 NativeOptions_LanguageIndex(void)

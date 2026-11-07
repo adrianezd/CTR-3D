@@ -13,6 +13,7 @@
  *   CustomFlag                                          blue checkered flag
  *   PaintJobs             (Superstarxalien)             kart colours, L/R in character select
  *   NewKartTextures       (Superstarxalien)             gold and silver kart pipe framing
+ *   AdvBosses             (Niko)                        unlockable characters in Adventure
  *
  * The toggles are plain ints, ON by default, flipped from the 3DS OPTIONS menu.
  */
@@ -31,9 +32,17 @@ extern int g_modMirror;
 extern int g_modMoonGravity;
 extern int g_modItemChaos;
 extern int g_modIcy;
+extern int g_modBossRace;
+
+/* MODS > CHEATS: wumpa, masks, turbos, bombs, invisibility, engine, turbo pads, one lap, turbo counter */
+#define MOD_CHEAT_COUNT 9
+extern int g_modCheat[MOD_CHEAT_COUNT];
 
 /* language index of the OPTIONS table (0 English ... 4 Spanish, 5 Dutch); 0 on PC */
 s32 NativeOptions_LanguageIndex(void);
+
+/* true for a string slot the OPTIONS/MODS menus repoint (game/SelectProfile.c skips them) */
+b32 NativeOptions_IsOwnString(s32 index);
 
 /* strings for repointed LNG slots; called after every LOAD_LangFile */
 void NativeMods_InstallStrings(void);
@@ -78,6 +87,10 @@ char *NativeMods_EngineName(s32 characterID);
 s32 NativeMods_AdvDifficulty(s32 computed, b32 boss);
 s32 NativeMods_AdvRandomPad(s32 levelID);
 s32 NativeMods_AdvRandomHub(s32 hubID);
+
+/* AdvBosses: game/233/CS_Garage.c; boss races in Arcade: game/MAIN/MainMain.c */
+b32 NativeMods_GarageCharacterInput(s16 *slotCharacter, u32 tap);
+void NativeMods_BeforeLevelLoad(s32 levelID);
 
 /* CTR Unlimited-style modes: game/GAMEPAD.c, Vehicle/VehBirth.c, Vehicle/VehPhysGeneral.c */
 b32 NativeMods_MirrorActive(void);

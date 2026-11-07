@@ -330,6 +330,16 @@ void CS_Garage_MenuProc(struct RectMenu *menu)
 	garageFrames = gGarage.numFramesCurr_GarageMove;
 
 #ifdef CTR_NATIVE
+	// AdvBosses: L/R swap Crash's slot for an unlockable character
+	if ((gGarage.boolSelected == 0) && (currSelectIndex == 0) && ((gGT->renderFlags & RENDER_FLAG_CHECKERED_FLAG) == 0) &&
+	    NativeMods_GarageCharacterInput(&gGarage.garageCharacterIDs[0], sdata->AnyPlayerTap))
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			gGarage.statBarLengths[i] = 0;
+		}
+	}
+
 	// EngineSelect: Up/Down change the class while the character is selected
 	if (NativeMods_EngineSelectActive() && (gGarage.boolSelected == 1) && ((gGT->renderFlags & RENDER_FLAG_CHECKERED_FLAG) == 0) &&
 	    NativeMods_GarageEngineInput(currCharacterID, sdata->AnyPlayerTap))
@@ -594,6 +604,11 @@ void CS_Garage_Init(void)
 {
 	// go to 3D character selection
 	sdata->ptrActiveMenu = &gGarage.menuGarage;
+
+#ifdef CTR_NATIVE
+	// AdvBosses: every visit starts with Crash in his own slot
+	gGarage.garageCharacterIDs[0] = 0;
+#endif
 
 	gGarage.menuGarage.state &= ~(ONLY_DRAW_TITLE);
 

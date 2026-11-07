@@ -304,6 +304,9 @@ u32 main(void)
 						gGT->gameMode1 = (gameMode1 | AddBitsConfig0) & ~RemBitsConfig0;
 						gGT->gameMode2 = (gameMode2 | AddBitsConfig8) & ~RemBitsConfig8;
 
+#ifdef CTR_NATIVE
+						NativeMods_BeforeLevelLoad(sdata->Loading.Lev_ID_To_Load);
+#endif
 						MainRaceTrack_StartLoad(sdata->Loading.Lev_ID_To_Load);
 					}
 

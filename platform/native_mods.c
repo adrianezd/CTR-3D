@@ -20,6 +20,10 @@ int g_modMirror = 0;
 int g_modMoonGravity = 0;
 int g_modItemChaos = 0;
 int g_modIcy = 0;
+int g_modBossRace = 0;
+
+/* Retail cheat codes as MODS > CHEATS toggles, all off by default. */
+int g_modCheat[MOD_CHEAT_COUNT];
 
 #define MOD_LANGS 6
 #define MOD_CHARACTERS 16
@@ -276,7 +280,7 @@ static b32 NativeMods_RandomRivalsAllowed(void)
 {
 	struct GameTracker *gGT = sdata->gGT;
 
-	return g_modRandomRivals && ((gGT->gameMode1 & ARCADE_MODE) != 0) && ((gGT->gameMode1 & (ADVENTURE_MODE | TIME_TRIAL | MAIN_MENU)) == 0) &&
+	return g_modRandomRivals && ((gGT->gameMode1 & ARCADE_MODE) != 0) && ((gGT->gameMode1 & (ADVENTURE_MODE | TIME_TRIAL | MAIN_MENU | ADVENTURE_BOSS)) == 0) &&
 	       (gGT->numPlyrCurrGame == 1);
 }
 
@@ -867,11 +871,19 @@ void NativeMods_ChaosItem(struct Driver *driver)
 	driver->heldItemID = pool[((u32)sdata->randomNumber >> 8) % (u32)sizeof(pool)];
 }
 
-/* Icy tracks: retail's SLEDROAD cheat flag, kept in step with the toggle. */
+/* Icy tracks: retail's SLEDROAD cheat flag, kept in step with the toggle. The CHEATS toggles work
+ * the same way. Retail drops the item cheats (wumpa, masks, turbos, engine, bombs) when you enter
+ * Adventure or Time Trial, so they stay off there. A cheat typed as a code is left alone. */
+static const u32 s_modCheatBits[MOD_CHEAT_COUNT] = {CHEAT_WUMPA,     CHEAT_MASK,     CHEAT_TURBO,    CHEAT_BOMBS,      CHEAT_INVISIBLE,
+                                                    CHEAT_ENGINE,    CHEAT_TURBOPAD, CHEAT_ONELAP,   CHEAT_TURBOCOUNT};
+
 static void NativeMods_SyncFlags(void)
 {
 	static int s_icyWas;
+	static u8 s_cheatWas[MOD_CHEAT_COUNT];
+	const u32 itemCheats = CHEAT_WUMPA | CHEAT_MASK | CHEAT_TURBO | CHEAT_ENGINE | CHEAT_BOMBS;
 	struct GameTracker *gGT = sdata->gGT;
+	b32 noItemCheats;
 
 	if (gGT == NULL)
 	{
@@ -886,6 +898,118 @@ static void NativeMods_SyncFlags(void)
 		gGT->gameMode2 &= ~CHEAT_ICY;
 	}
 	s_icyWas = g_modIcy;
+
+	noItemCheats = (gGT->gameMode1 & (ADVENTURE_MODE | TIME_TRIAL)) != 0;
+	for (s32 i = 0; i < MOD_CHEAT_COUNT; i++)
+	{
+		u32 bit = s_modCheatBits[i];
+		b32 want = g_modCheat[i] && !(((bit & itemCheats) != 0) && noItemCheats);
+
+		if (want)
+		{
+			gGT->gameMode2 |= bit;
+		}
+		else if (s_cheatWas[i])
+		{
+			gGT->gameMode2 &= ~bit;
+		}
+		s_cheatWas[i] = (u8)(want ? 1 : 0);
+	}
+}
+
+/* -------------------------------------------------------------- AdvBosses --- */
+
+/* Adventure garage (Niko's AdvBosses): with Crash's slot highlighted, L and R swap it for one of
+ * the unlockable characters. The 3D model stays Crash; the name, the stats and the character you
+ * play the adventure with change. Oxide stays out, as in the original mod. */
+static const s8 s_modAdvCharacters[] = {0, 8, 9, 10, 11, 12, 13, 14}; /* Crash, Pinstripe, Papu, Roo, Joe, Tropy, Penta, Fake Crash */
+#define MOD_ADV_CHARACTER_COUNT ((s32)sizeof(s_modAdvCharacters))
+
+static const char *const s_modAdvCharHint[MOD_LANGS] = {"L OR R: SWAP CHARACTER", "L OU R: CHANGER PERSO", "L ODER R: FIGUR WECHSELN",
+                                                        "L O R: CAMBIA PERSONAGGIO", "L O R: CAMBIAR PERSONAJE", "L OF R: ANDER PERSONAGE"};
+
+b32 NativeMods_GarageCharacterInput(s16 *slotCharacter, u32 tap)
+{
+	s32 at = 0;
+
+	for (s32 i = 0; i < MOD_ADV_CHARACTER_COUNT; i++)
+	{
+		if (s_modAdvCharacters[i] == *slotCharacter)
+		{
+			at = i;
+		}
+	}
+
+	DecalFont_DrawLine((char *)s_modAdvCharHint[NativeMods_Lang()], 0x100, 0xc8, FONT_SMALL, (JUSTIFY_CENTER | ORANGE));
+
+	if (tap & BTN_L1)
+	{
+		at = (at + MOD_ADV_CHARACTER_COUNT - 1) % MOD_ADV_CHARACTER_COUNT;
+	}
+	else if (tap & BTN_R1)
+	{
+		at = (at + 1) % MOD_ADV_CHARACTER_COUNT;
+	}
+	else
+	{
+		return false;
+	}
+
+	*slotCharacter = s_modAdvCharacters[at];
+	OtherFX_Play(0, 1);
+	return true;
+}
+
+/* ------------------------------------------------------------- Boss races --- */
+
+/* With the toggle on, a single Arcade race for one player on a boss track is that boss's race,
+ * one on one, as in Adventure: Roo's Tubes, Papu's Pyramid, Dragon Mines, Hot Air Skyway and
+ * Oxide Station. The boss uses its adventure item script (it is tied to its track) and the
+ * arcade difficulty picks how hard it drives. Called right before every level load starts, after
+ * the load's mode bits are in place (game/MAIN/MainMain.c). */
+void NativeMods_BeforeLevelLoad(s32 levelID)
+{
+	struct GameTracker *gGT = sdata->gGT;
+	s32 bossID = -1;
+
+	if ((gGT == NULL) || ((gGT->gameMode1 & ADVENTURE_MODE) != 0))
+	{
+		return; /* retail boss races */
+	}
+
+	if (g_modBossRace && ((gGT->gameMode1 & ARCADE_MODE) != 0) && ((gGT->gameMode2 & CUP_ANY_KIND) == 0) && (gGT->numPlyrNextGame == 1))
+	{
+		switch (levelID)
+		{
+		case ROO_TUBES:
+			bossID = 0;
+			break;
+		case PAPU_PYRAMID:
+			bossID = 1;
+			break;
+		case DRAGON_MINES:
+			bossID = 2;
+			break;
+		case HOT_AIR_SKYWAY:
+			bossID = 3;
+			break;
+		case OXIDE_STATION:
+			bossID = 4;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (bossID < 0)
+	{
+		gGT->gameMode1 &= ~ADVENTURE_BOSS;
+		return;
+	}
+
+	gGT->gameMode1 |= ADVENTURE_BOSS;
+	gGT->bossID = bossID;
+	data.characterIDs[1] = data.metaDataLEV[levelID].characterID_Boss;
 }
 
 /* ------------------------------------------------------------- CustomCups --- */

@@ -1162,6 +1162,14 @@ static void SelectProfile_DrawMemcardMessage(int screen, int color, int menuFlag
 		{
 			char *line = sdata->lngStrings[firstString + i];
 
+#ifdef CTR_NATIVE
+			// slots repointed by the native menus are empty retail lines here
+			if (NativeOptions_IsOwnString(firstString + i))
+			{
+				continue;
+			}
+#endif
+
 			if (strlen(line) != 0)
 			{
 				int font = (i == 0) ? FONT_BIG : FONT_SMALL;
